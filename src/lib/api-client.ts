@@ -152,6 +152,14 @@ class ApiClient {
   async delete<T>(url: string, options?: ApiRequestOptions): Promise<T> {
     return this.request<T>(url, { ...options, method: 'DELETE' })
   }
+
+  async patch<T>(url: string, data: any, options?: ApiRequestOptions): Promise<T> {
+    return this.request<T>(url, {
+      ...options,
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    })
+  }
 }
 
 // Export singleton instance
@@ -223,6 +231,57 @@ export const api = {
       const response = await apiClient.get<{ data: { streams: string[] } }>(
         '/api/memories/streams'
       )
+      return response.data
+    }
+  },
+
+  // API Key endpoints
+  apiKeys: {
+    list: async () => {
+      const response = await apiClient.get<{ 
+        data: { 
+          keys: Array<{
+            id: string
+            name: string
+            key_prefix: string
+            created_at: string
+            last_used_at: string | null
+            expires_at: string | null
+            revoked_at: string | null
+            isActive: boolean
+            isExpired: boolean
+            isRevoked: boolean
+          }> 
+        } 
+      }>('/api/keys')
+      return response.data
+    },
+    
+    create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {
+      const response = await apiClient.post<{ 
+        data: {
+          id: string
+          name: string
+          key_prefix: string
+          created_at: string
+          expires_at: string | null
+          key: string
+        } 
+      }>('/api/keys', { name, expiresInDays, environment })
+      return response.data
+    },
+    
+    revoke: async (id: string) => {
+      const response = await apiClient.patch<{ 
+        data: { message: string } 
+      }>(`/api/keys/${id}`, { action: 'revoke' })
+      return response.data
+    },
+    
+    delete: async (id: string) => {
+      const response = await apiClient.delete<{ 
+        data: { message: string } 
+      }>(`/api/keys/${id}`)
       return response.data
     }
   }

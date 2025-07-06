@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase'
+import { supabase } from '@/lib/supabase'
 import { RealtimeChannel } from '@supabase/supabase-js'
 
 interface Task {
@@ -32,7 +32,6 @@ export function useTaskSubscription(options: UseTaskSubscriptionOptions = {}) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
   
-  const supabase = createClient()
 
   useEffect(() => {
     let channel: RealtimeChannel | null = null

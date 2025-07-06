@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase-server'
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 import { z } from 'zod'
 import { cookies } from 'next/headers'
+import { requireAuth } from '@/lib/auth-unified'
 
 // Initialize SNS client
 const snsClient = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
@@ -24,16 +25,9 @@ const taskSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
+    const user = await requireAuth(request)
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     // Parse and validate request body
     const body = await request.json()
@@ -119,6 +113,13 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Task creation error:', error)
     
+    if (error instanceof Error && error.message === 'Authentication required') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
     if (error instanceof z.ZodError) {
       return NextResponse.json(
         { error: 'Invalid request', details: error.errors },
@@ -136,16 +137,9 @@ export async function POST(request: NextRequest) {
 // Get task status
 export async function GET(request: NextRequest) {
   try {
+    const user = await requireAuth(request)
     const cookieStore = await cookies()
     const supabase = createClient(cookieStore)
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
-    }
 
     const { searchParams } = new URL(request.url)
     const taskId = searchParams.get('id')
@@ -188,6 +182,14 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Task fetch error:', error)
+    
+    if (error instanceof Error && error.message === 'Authentication required') {
+      return NextResponse.json(
+        { error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+    
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

@@ -4,7 +4,7 @@ import { User } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { AuthState } from '@/lib/auth'
 
-export function useAuth(): AuthState {
+export function useAuth() {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<AuthState['error']>(null)
@@ -31,5 +31,12 @@ export function useAuth(): AuthState {
     return () => subscription.unsubscribe()
   }, [])
 
-  return { user, loading, error }
+  const signOut = async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      setError({ message: error.message })
+    }
+  }
+
+  return { user, loading, error, signOut }
 }

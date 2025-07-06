@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Group, Button, Container, Text } from '@mantine/core'
 import { useAuth } from '@/hooks/useAuth'
-import { IconHome, IconChecklist, IconLogin, IconLogout, IconUser } from '@tabler/icons-react'
+import { IconHome, IconChecklist, IconLogin, IconLogout, IconUser, IconSettings } from '@tabler/icons-react'
 
 export function Navigation() {
   const pathname = usePathname()
@@ -36,15 +36,26 @@ export function Navigation() {
               </Button>
               
               {user && (
-                <Button
-                  component={Link}
-                  href="/tasks"
-                  variant={pathname === '/tasks' ? 'filled' : 'subtle'}
-                  leftSection={<IconChecklist size={16} />}
-                  size="sm"
-                >
-                  Tasks
-                </Button>
+                <>
+                  <Button
+                    component={Link}
+                    href="/tasks"
+                    variant={pathname === '/tasks' ? 'filled' : 'subtle'}
+                    leftSection={<IconChecklist size={16} />}
+                    size="sm"
+                  >
+                    Tasks
+                  </Button>
+                  <Button
+                    component={Link}
+                    href="/settings/api-keys"
+                    variant={pathname.startsWith('/settings') ? 'filled' : 'subtle'}
+                    leftSection={<IconSettings size={16} />}
+                    size="sm"
+                  >
+                    Settings
+                  </Button>
+                </>
               )}
             </Group>
           </Group>
