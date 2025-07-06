@@ -1,0 +1,50 @@
+  1. LLM Provider Decision
+  Which LLM provider should we use for the orchestrator? (OpenAI, Anthropic, or both?) This affects our API client design and cost structure.
+
+By default, a user will use Claude Opus 4. They should have the option to choose OpenAI GPT 4.1, 4o, and Claude Sonnet. But the default is Claude Opus 4 for all LLM actions.
+
+  2. Deployment Strategy
+  Are we using Supabase's hosted platform or planning for self-hosting? This affects our deployment scripts and monitoring setup.
+
+We are hosting on Supabase
+
+  3. Realtime Requirements
+  Should we implement Supabase Realtime for any initial features? (e.g., live interaction updates, agent discussions in progress)
+
+Yes. Absolutely.
+
+  4. Development Priorities
+  What's your preferred order for these foundational pieces?
+  - Edge Functions structure + deployment
+  - Authentication flows (login/signup)
+  - Logging/monitoring system
+  - Error handling framework
+  - API client with retries/rate limiting
+
+You have the right order right here. I would add the concept of user API keys to Hawking Edison (Hawking Edison API Keys) right after you finish Authentication flows. *** Make sure these flows actually work with a test case. Every flow, sign up - login, etc. Make sure your authentication flow has some basic concept of user verification to ensure that a human being with a real e-mail address is signing up. Check to see through a WebSearch whether Supabase does this for us. ***
+
+
+  5. Local Development Setup
+  How do you want to handle secrets between local and production? Should we use:
+  - .env.local for local, .env.production for prod?
+  - Supabase CLI's built-in env management?
+  - A secrets management service?
+
+Let's use Supabase CLI's built-in env management.
+
+  6. Monitoring Preferences
+  For production monitoring, should we:
+  - Start with just Supabase's built-in dashboard?
+Yes
+
+  - Set up Prometheus/Grafana immediately?
+No
+
+  - Integrate with a service like New Relic?
+No
+
+  7. Testing Infrastructure
+  Should we set up CI/CD with GitHub Actions now, or focus on local testing first?
+Focus on local testing first.
+
+  These decisions will significantly impact our initial architecture. What are your thoughts?

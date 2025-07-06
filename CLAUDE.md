@@ -48,10 +48,13 @@ npm run start           # Start production server
 git add .               # Stage changes
 git commit -m "..."     # Commit changes
 git push               # Push to GitHub (repo: hawking-edison)
+git remote ...         # Manage remotes
+git rm ...             # Remove files
 
-# NPM (Claude has permission to run these)
+# NPM/NPX (Claude has permission to run these)
 npm install            # Install dependencies
 npm run ...            # Run any npm script
+npx ...                # Run npx commands
 ```
 
 ### File Structure
