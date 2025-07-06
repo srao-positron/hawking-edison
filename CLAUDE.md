@@ -51,6 +51,10 @@ git push               # Push to GitHub (repo: hawking-edison)
 git remote ...         # Manage remotes
 git rm ...             # Remove files
 
+# IMPORTANT: Before pushing code
+# Always run Playwright tests locally first:
+npm run test:e2e        # Must pass before pushing!
+
 # NPM/NPX (Claude has permission to run these)
 npm install            # Install dependencies
 npm run ...            # Run any npm script
