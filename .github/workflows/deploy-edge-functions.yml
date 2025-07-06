@@ -1,0 +1,100 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-edge-functions.yml'
+  workflow_dispatch:
+    inputs:
+      deploy_function:
+        description: 'Specific function to deploy (leave empty for all)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: bknpldydmkzupsfagnva
+        run: |
+          # Link to project
+          supabase link --project-ref $SUPABASE_PROJECT_ID
+          
+          # Deploy specific function or all functions
+          if [ -n "${{ github.event.inputs.deploy_function }}" ]; then
+            echo "Deploying specific function: ${{ github.event.inputs.deploy_function }}"
+            supabase functions deploy ${{ github.event.inputs.deploy_function }} --project-ref $SUPABASE_PROJECT_ID
+          else
+            echo "Deploying all functions..."
+            # Deploy each function
+            for function in interact databank memories auth-api-keys; do
+              echo "Deploying $function..."
+              supabase functions deploy $function --project-ref $SUPABASE_PROJECT_ID
+            done
+          fi
+
+      - name: Set Function Secrets
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: bknpldydmkzupsfagnva
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          echo "Setting Edge Function secrets..."
+          
+          # Create secrets file
+          cat > .env.functions <<EOF
+          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
+          OPENAI_API_KEY=$OPENAI_API_KEY
+          EOF
+          
+          # Set secrets for all functions
+          supabase secrets set --env-file .env.functions --project-ref $SUPABASE_PROJECT_ID
+          
+          # Clean up
+          rm .env.functions
+
+      - name: Test Deployed Functions
+        run: |
+          echo "Testing deployed functions..."
+          npm run deploy:check
+
+      - name: Notify on Success
+        if: success()
+        run: |
+          echo "✅ Edge Functions deployed successfully!"
+          echo "Functions available at:"
+          echo "  - https://bknpldydmkzupsfagnva.supabase.co/functions/v1/interact"
+          echo "  - https://bknpldydmkzupsfagnva.supabase.co/functions/v1/databank"
+          echo "  - https://bknpldydmkzupsfagnva.supabase.co/functions/v1/memories"
+          echo "  - https://bknpldydmkzupsfagnva.supabase.co/functions/v1/auth-api-keys"
+
+      - name: Notify on Failure
+        if: failure()
+        run: |
+          echo "❌ Edge Functions deployment failed!"
+          echo "Check the logs above for details."
