@@ -12,6 +12,7 @@ const logger = createLogger('interact')
 const tools = {
   // Placeholder for tool implementations
   // Will be populated with createAgent, runDiscussion, etc.
+  // Tools coming soon!
 }
 
 interface InteractRequest {
