@@ -117,7 +117,6 @@ auth_token = "env(SUPABASE_AUTH_SMS_TWILIO_AUTH_TOKEN)"
 [functions]
 # Uncomment to use Edge Runtime + Deno. Be aware that the hosted version is still early and may have performance
 # issues. For production usage of Edge Functions, we recommend self-hosting them for the time being.
-edge_runtime = "deno"
 
 [analytics]
 enabled = false
@@ -125,46 +124,3 @@ port = 54327
 vector_port = 54328
 # Configure one of the supported backends: `postgres`, `bigquery`.
 backend = "postgres"
-[functions.interact]
-enabled = true
-verify_jwt = true
-import_map = "./functions/interact/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/interact/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/interact/*.html" ]
-
-[functions.databank]
-enabled = true
-verify_jwt = true
-import_map = "./functions/databank/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/databank/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/databank/*.html" ]
-
-[functions.memories]
-enabled = true
-verify_jwt = true
-import_map = "./functions/memories/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/memories/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/memories/*.html" ]
-
-[functions.auth-api-keys]
-enabled = true
-verify_jwt = true
-import_map = "./functions/auth-api-keys/deno.json"
-# Uncomment to specify a custom file path to the entrypoint.
-# Supported file extensions are: .ts, .js, .mjs, .jsx, .tsx
-entrypoint = "./functions/auth-api-keys/index.ts"
-# Specifies static files to be bundled with the function. Supports glob patterns.
-# For example, if you want to serve static HTML pages in your function:
-# static_files = [ "./functions/auth-api-keys/*.html" ]

@@ -115,19 +115,33 @@ async function cleanupTestUser(userId: string) {
   return true
 }
 
-async function testDatabaseAccess() {
+async function testDatabaseAccess(userId: string) {
   console.log('\n6️⃣  Testing Database Access with RLS...')
   
-  // First sign in to get a user session
-  await supabase.auth.signInWithPassword({
+  // Create a regular client (not admin) to test RLS
+  const userSupabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  )
+
+  // Sign in to get a user session
+  const { data: authData, error: authError } = await userSupabase.auth.signInWithPassword({
     email: testEmail,
     password: testPassword
   })
 
-  // Try to insert an interaction
-  const { data, error } = await supabase
+  if (authError) {
+    console.error('❌ Failed to sign in for DB test:', authError.message)
+    return false
+  }
+
+  console.log('   Signed in successfully for DB test')
+
+  // Try to insert an interaction with the user's ID
+  const { data, error } = await userSupabase
     .from('interactions')
     .insert({
+      user_id: userId,  // Explicitly set user_id
       input: 'Test interaction',
       tool_calls: [],
       result: { test: true }
@@ -137,14 +151,28 @@ async function testDatabaseAccess() {
 
   if (error) {
     console.error('❌ Database insert failed:', error.message)
+    console.error('   Details:', error)
     return false
   }
 
   console.log('✅ Database insert successful')
   console.log('   Interaction ID:', data.id)
   
+  // Verify we can read it back
+  const { data: readData, error: readError } = await userSupabase
+    .from('interactions')
+    .select('*')
+    .eq('id', data.id)
+    .single()
+
+  if (readError) {
+    console.error('❌ Failed to read back interaction:', readError.message)
+  } else {
+    console.log('✅ Successfully read back interaction')
+  }
+  
   // Clean up
-  await supabase.from('interactions').delete().eq('id', data.id)
+  await userSupabase.from('interactions').delete().eq('id', data.id)
   
   return true
 }
@@ -159,9 +187,13 @@ async function runTests() {
 
   await testSignIn()
   await testGetUser()
-  await testDatabaseAccess()
+  await testDatabaseAccess(userId)  // Pass userId
   await testSignOut()
+  
+  // Test password reset BEFORE deleting the user
   await testPasswordReset()
+  
+  // Clean up at the very end
   await cleanupTestUser(userId)
 
   console.log('\n' + '='.repeat(60))
