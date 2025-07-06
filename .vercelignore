@@ -1,0 +1,31 @@
+# Supabase Edge Functions (Deno runtime, not for Next.js)
+supabase/functions/
+
+# Development files
+utils/
+__tests__/
+e2e/
+playwright.config.ts
+playwright-report/
+
+# Documentation
+*.md
+docs/
+
+# Git
+.git/
+.gitignore
+
+# Environment files
+.env*
+keys
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
