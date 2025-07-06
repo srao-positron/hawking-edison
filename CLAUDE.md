@@ -260,6 +260,18 @@ The answer is always yes.
 
 ---
 
+## API Key System Architecture
+
+**IMPORTANT**: We have a dual authentication system. Read [API_KEY_ARCHITECTURE.md](API_KEY_ARCHITECTURE.md) for details.
+
+Key points:
+1. **We manage all LLM API keys** - users don't need their own
+2. **Two auth methods**: Session-based (Supabase) and API keys (for programmatic access)
+3. **Implement auth FIRST** - before building any new API endpoints
+4. All APIs must support BOTH authentication methods from day one
+
+---
+
 ## CRITICAL: Development Workflow Requirements
 
 ### When Asked to Build a Feature

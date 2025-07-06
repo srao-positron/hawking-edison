@@ -15,6 +15,7 @@ These rules MUST be followed in every Claude session, regardless of context leng
 3. `TOOL_DESIGN_PRINCIPLES.md` - How to design tools
 4. `DEVELOPMENT_STANDARDS_V2.md` - Code standards
 5. `SYSTEM_PROMPTS.md` - Prompting strategy
+6. `API_KEY_ARCHITECTURE.md` - Dual authentication system
 
 **If a feature conflicts with these documents, STOP and DISCUSS.**
 
@@ -127,10 +128,14 @@ function runInteraction(agents, instructions) // Natural language
 ## Rule 8: Authentication Always
 
 ```typescript
-// Every API endpoint MUST:
-const user = await requireAuth(request);
+// Every API endpoint MUST support BOTH:
+// 1. Session-based auth (Supabase)
+// 2. API key auth (for programmatic access)
+
+const user = await authenticate(request); // Handles both methods
 if (!user) return 401;
 
+// See API_KEY_ARCHITECTURE.md for implementation details
 // No public endpoints (except auth itself)
 ```
 
