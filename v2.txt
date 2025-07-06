@@ -1,0 +1,46 @@
+Hawking Edison v2
+
+We started building Hawking Edison 30 to 60 days ago. Hawking Edison, at its core, leverages multiple virtual agents powered by a large language model (LLM), such as Anthropic’s Claude or OpenAI’s GPT. Agents have the following properties:
+1) They have a personality. Their personality attributes are sourced from either social media (e.g., profiles imported using a social media importing browser extension) or defined by flexible attributes (e.g., age range between 18-30, liberal versus conservative, male versus female). In the case of personalities sourced from real people, we attempt to gather as much information as possible about the target personality, typically from the web, as well as from custom data sources such as research papers they have authored. In the case of attributes, the attributes are randomly selected from the ranges at the time an agent is asked to do work.
+2) Agents have access to tools. We provide ten tools to agents today, including the ability to search the web, access their conversation history (e.g., from a panel), and retrieve information from a vector-indexed embedding database (e.g., research papers). Currently, we have to write tools and add them to the library of available tools for an agent.
+3) Agents belong to cohorts and segments, which are essentially collections.
+4) Agents are assigned a particular model that they belong to.
+5) Users have to setup and configure all of these properties before agents can be used.
+
+Once agents have been set up in cohorts, they can be used in a feature-rich application that has taken many turns, with many different capabilities, including:
+1) The ability to simulate reactions to marketing, political, and research messages. We see two use cases here, one is being a “Grammarly” style application to make it easy to improve writing and messaging in scenarios where content has to be put out quickly, it is too expensive to run a focus group or formal survey, or the content is being generated too quickly or automatically.
+2) The ability to be used in panel discussions, including competitive debates, ad-hoc discussions, problem solving, ideation, and many other types of panel scenarios. We see an untapped opportunity to use this capability for problem solving.
+3) Agents can be used to fill out surveys.
+4) And many more capabilities.
+
+We keep on thinking of, encountering, and being asked to consider new use cases for these agents. All of the scenarios are ad-hoc in nature, but let me give you an understanding of the more popular use cases:
+1) Setup a panel to run a code review with agents coming from a diverse set of viewpoints: security, availability, operations, and algorithms/data structures.
+2) Setup a panel to ideate on a roadmap to AGI, hosted by 12 agents representing senior researchers from OpenAI, Anthropic, and Google. Have this panel compete to come up with new ideas in a non-zero sum game. The panelists had access to an embedding database of research papers they had written.
+3) Setup a panel to come up with decision support as to whether OpenAI should buy Anthropic.
+4) A panel to evaluate legal decisions by the Supreme Court. In some cases, they would actually debate each other from a perspective of the plaintiff and defendant.
+5) A survey about nuclear power.
+6) Various simulations about political, marketing (both B2B (powered by LinkedIn profiles) and B2C use cases).
+
+In some cases, the use case involved making ad-hoc, quick responses (e.g., testing political messaging). In other cases, we wanted the agents to think deeply.
+
+We then provided an integration with MCP, tried to build a browser extension (the usability of the extension was horrible), and other API integrations. We noted that tool use made the bots more intelligent, as well as using the bots in a panel setup.
+
+I would now like to re-imagine this application, solving a number of challenges along the way:
+1) Multi-agent is really powerful, and this is the core capability - we enable instantaneous multi-agent orchestration to solve problems, test and evaluate messages, and ultimately improve the user.
+2) We think there is a really strong opportunity in decision support, message improvement (kind of a form of decision support), and problem solving. We like the fact that bots self-organize. Users don’t have to organize bots and make a bunch of design decisions.
+3) We really hit the ball out of the park with the panels functionality - but it is too hard to use. It should be like “I want to setup a code review panel that can use a GitHub tool” and it should ask a couple clarifying questions and setup the right agent setup with the right personalities, build a GitHub tool if it doesn’t exist, and then store the user’s GitHub PAT (or do OAuth).
+4) Same with research and data stores. It was an absolute pain to ingest data and setup stores. We need a unified ad-hoc, unstructured, embedded yet indexed store that users can literally drop all kinds of data in - research papers, LinkedIn profiles. Then this store can be used to shape personalities for agents or be a data store used by panel participants. “I want to create an agent that has a personality like Sid Rao” - it then searches this personal database to find Sid Rao’s LinkedIn papers, CRM records, Excel spreadsheets that reference Sid, and web URLs that have been stored away. We have an extension that allows you to index pages, social media profiles, and all kinds of data. PDFs. Word documents. Google sheets people are on.
+5) The user interface was excessively complex and not easy to use. I’m thinking we need to build a Slack style interface - chat. You would type a chat like “I want to run a simulation that tests this message with 200 participants that have these attributes” and then on the right the simulation starts to run, build, and you can see the results. If you run a panel, you see the panel dialog and summary in the right - like a sub-thread. 
+6) There was no API. No clear security mechanism.
+7) Model selection was problematic. We want a diverse set of models, but we need to be smart about what models are used for what kinds of use cases. Perhaps we just standardize on a single model, (Claude Opus 4) and let the user override it.
+8) Users should be able to build their own tools. Just a simple JavaScript, TypeScript, or Python tool. And have a very clear way to document the tool. We then augment this documentation with LLM generated content that ensures the calling agent really knows how to use the tool.
+9) If the user wants, we should build tools automatically for them based on the use case in question. We should also have a richer set of default tools that we give the LLM agent to use.
+10) MCP was a real hit, but we never got the OAuth mechanism between Claude Web and the service to work. As a result, it was this really complicated client side mechanism that required an API key to be transferred and some npx package to be run through some hand configured client side Claude Code configuration. What a mess.
+11) And of course we didn’t have centralized code handling between MCP, the portal, and all the extensions - so we had five different ways to run a simulation or a panel in the platform.
+12) I did like the styling and matine use - but we didn’t have good style management or centralized styling.
+
+Architecturally, I have heard Supabase is what we should be using for startup projects. I’d like to switch to that instead of the AWS Amplify story. We also didn’t have a really clean structure. Some stuff ran in the browser. Some stuff ran in the web server. I think we were all confused as to what to use. We also probably weren’t using the right Next.js setup either.
+
+I would like Claude to read the code and various plans and other documentation to Maxwell Edison which is in ../maxwell-edison/. Then I would like Claude to emit a development plan in grotesque detail, thinking through all of the steps. I would like Claude to ask me clarifying questions and be very thorough in gathering requirements to figure out the detailed development plan. We will then begin the work to reimplement the platform on Supabase. Before we do this, I would like Claude to emit a set of rules and standards we want Claude to follow as it goes through development. One of the rules is that before noting a feature is complete, Claude creates a test. Another rule is that Claude cannot use fallback, fake, or hack code to try to complete a feature. Workarounds are not appropriate unless I explicitly authorize it. Finally, I would like Claude to have a rule that they ask Claude (maybe through a script) to self-review their own code prior to saying that a task has been completed - so the test has to pass and Claude’s self-review has to pass as well. I would like Claude to think deeply before beginning to write code.
+
+OK - ready to get started?
