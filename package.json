@@ -27,6 +27,7 @@
     "test:llm": "tsx utils/test-llm-keys.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-sns": "^3.840.0",
     "@mantine/core": "^8.1.2",
     "@mantine/dates": "^8.1.2",
     "@mantine/form": "^8.1.2",
@@ -36,7 +37,8 @@
     "@supabase/supabase-js": "^2.45.8",
     "next": "15.3.5",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "zod": "^3.25.74"
   },
   "devDependencies": {
     "@playwright/test": "^1.49.1",

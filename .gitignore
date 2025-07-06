@@ -48,3 +48,8 @@ supabase/functions/_deploy/
 
 # keys file (contains sensitive data)
 keys
+
+# CDK outputs and build artifacts
+infrastructure/cdk/outputs.json
+infrastructure/cdk/cdk.out/
+infrastructure/cdk/dist/
