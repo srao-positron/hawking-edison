@@ -45,7 +45,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/auth/signup')
     
     // 2. Fill signup form
-    await page.fill('input[type="email"]', testEmail)
+    await page.fill('input[placeholder="your@email.com"]', testEmail)
     await page.fill('input[placeholder="Create a strong password"]', testPassword)
     await page.fill('input[placeholder="Confirm your password"]', testPassword)
     
@@ -85,7 +85,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/auth/login')
     
     // 2. Fill login form
-    await page.fill('input[type="email"]', testEmail)
+    await page.fill('input[placeholder="your@email.com"]', testEmail)
     await page.fill('input[type="password"]', testPassword)
     
     // 3. Submit form
@@ -95,7 +95,7 @@ test.describe('Authentication Flow', () => {
     await waitForNavigation(page, '/')
     
     // 5. Verify we're logged in by checking the page
-    await expect(page.locator('h1:has-text("Hawking Edison")')).toBeVisible()
+    await expect(page.locator('h1').first()).toContainText('Hawking Edison')
   })
 
   test('login with invalid credentials', async ({ page }) => {
@@ -103,14 +103,14 @@ test.describe('Authentication Flow', () => {
     await page.goto('/auth/login')
     
     // 2. Fill login form with invalid credentials
-    await page.fill('input[type="email"]', 'invalid@example.com')
+    await page.fill('input[placeholder="your@email.com"]', 'invalid@example.com')
     await page.fill('input[type="password"]', 'wrongpassword')
     
     // 3. Submit form
     await page.click('button[type="submit"]')
     
     // 4. Should show error message
-    await expect(page.locator('.mantine-Alert-root')).toBeVisible()
+    await expect(page.locator('[role="alert"]')).toBeVisible()
     await expect(page.locator('text=Invalid login credentials')).toBeVisible()
     
     // 5. Should stay on login page
@@ -130,14 +130,14 @@ test.describe('Authentication Flow', () => {
     await page.goto('/auth/login')
     
     // 2. Fill login form
-    await page.fill('input[type="email"]', testEmail)
+    await page.fill('input[placeholder="your@email.com"]', testEmail)
     await page.fill('input[type="password"]', testPassword)
     
     // 3. Submit form
     await page.click('button[type="submit"]')
     
     // 4. Should show error about email confirmation
-    await expect(page.locator('.mantine-Alert-root')).toBeVisible()
+    await expect(page.locator('[role="alert"]')).toBeVisible()
     await expect(page.locator('text=Email not confirmed')).toBeVisible()
   })
 
@@ -160,7 +160,7 @@ test.describe('Authentication Flow', () => {
     await waitForNavigation(page, '/auth/forgot-password')
     
     // 4. Fill email
-    await page.fill('input[type="email"]', testEmail)
+    await page.fill('input[placeholder="your@email.com"]', testEmail)
     
     // 5. Submit form
     await page.click('button[type="submit"]')
@@ -176,7 +176,7 @@ test.describe('Authentication Flow', () => {
     await page.goto('/auth/signup')
     
     // Test weak password
-    await page.fill('input[type="email"]', testEmail)
+    await page.fill('input[placeholder="your@email.com"]', testEmail)
     await page.fill('input[placeholder="Create a strong password"]', 'weak')
     await page.fill('input[placeholder="Confirm your password"]', 'weak')
     
@@ -213,6 +213,6 @@ test.describe('Authentication Flow', () => {
     // Should redirect to login (if route is protected)
     // Note: Adjust this based on your actual route protection logic
     // For now, we'll just verify the page loads
-    await expect(page.locator('h1:has-text("Hawking Edison")')).toBeVisible()
+    await expect(page.locator('h1').first()).toContainText('Hawking Edison')
   })
 })
