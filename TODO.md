@@ -2,26 +2,12 @@
 
 ## CI/CD Improvements
 
-### Enable Playwright Tests in CI
-Currently disabled in `.github/workflows/test.yml` because tests need a running server.
+### ✅ Playwright Tests in CI - FIXED
+Playwright tests now run in CI against the Vercel deployment URL.
 
-Options to fix:
-1. **Build and run Next.js in CI** (preferred for true E2E testing)
-   - Add build step: `npm run build`
-   - Start server in background: `npm run start &`
-   - Wait for server to be ready
-   - Run tests against local server
-
-2. **Deploy to Vercel and test against preview URLs**
-   - Set up Vercel deployment
-   - Use preview URLs for PR tests
-   - Use production URL for main branch tests
-
-3. **Mock the backend for Playwright tests**
-   - Use Playwright's route mocking
-   - Test UI behavior without real backend
-
-To re-enable, remove `if: false` from the `test-playwright` job in `.github/workflows/test.yml`.
+- Tests use `https://hawking-edison.vercel.app` in CI
+- Tests use `http://localhost:3000` for local development
+- Configuration is automatic based on `process.env.CI`
 
 ## Pending Features
 

@@ -56,8 +56,8 @@ jobs:
 
   test-playwright:
     runs-on: ubuntu-latest
-    # Skip Playwright tests in CI until we have a deployment URL or can build the app
-    if: false
+    # Run Playwright tests against the Vercel deployment
+    needs: [test-auth]  # Run after auth tests to ensure deployment is ready
     
     steps:
       - name: Checkout code
