@@ -68,7 +68,7 @@ async function verifySupabase() {
   // Test 3: Display connection info
   console.log('\n3️⃣ Connection Details:')
   console.log('   Project URL:', supabaseUrl)
-  console.log('   Project ID:', supabaseUrl.split('.')[0].replace('https://', ''))
+  console.log('   Project ID:', supabaseUrl!.split('.')[0].replace('https://', ''))
   console.log('   Region:', 'us-east-1 (default)')
   
   // Test 4: Check if we can create tables
