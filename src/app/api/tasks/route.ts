@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase-server'
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 import { z } from 'zod'
+import { cookies } from 'next/headers'
 
 // Initialize SNS client
 const snsClient = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
@@ -23,7 +24,8 @@ const taskSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Verify authentication
-    const supabase = await createClient()
+    const cookieStore = await cookies()
+    const supabase = createClient(cookieStore)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
@@ -134,7 +136,8 @@ export async function POST(request: NextRequest) {
 // Get task status
 export async function GET(request: NextRequest) {
   try {
-    const supabase = await createClient()
+    const cookieStore = await cookies()
+    const supabase = createClient(cookieStore)
     const { data: { user }, error: authError } = await supabase.auth.getUser()
 
     if (authError || !user) {
