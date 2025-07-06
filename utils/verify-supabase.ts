@@ -31,7 +31,7 @@ async function verifySupabase() {
 
   // Test 1: Basic connection with anon key
   console.log('1️⃣ Testing public client connection...')
-  const publicClient = createClient(supabaseUrl, supabaseAnonKey)
+  const publicClient = createClient(supabaseUrl!, supabaseAnonKey!)
   
   try {
     const { data, error } = await publicClient.auth.getSession()
@@ -47,7 +47,7 @@ async function verifySupabase() {
 
   // Test 2: Service role connection
   console.log('\n2️⃣ Testing service role client...')
-  const serviceClient = createClient(supabaseUrl, supabaseServiceKey)
+  const serviceClient = createClient(supabaseUrl!, supabaseServiceKey!)
   
   try {
     // Try to query a system table to verify connection
