@@ -1,0 +1,16 @@
+{
+  "name": "hawking-edison-lambda",
+  "version": "1.0.0",
+  "description": "Lambda functions for Hawking Edison async tasks",
+  "main": "task-processor.js",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.24.3",
+    "@aws-sdk/client-secrets-manager": "^3.621.0",
+    "@supabase/supabase-js": "^2.45.0",
+    "openai": "^4.52.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.137",
+    "@types/node": "^20.14.0"
+  }
+}

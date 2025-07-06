@@ -1,0 +1,86 @@
+name: Deploy AWS Infrastructure
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'infrastructure/cdk/**'
+      - '.github/workflows/deploy-infrastructure.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-cdk:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: infrastructure/cdk/package-lock.json
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Install CDK dependencies
+        working-directory: infrastructure/cdk
+        run: |
+          npm ci
+          npm install -g aws-cdk
+
+      - name: Install Lambda dependencies
+        working-directory: infrastructure/cdk/lambda
+        run: npm ci
+
+      - name: Build CDK
+        working-directory: infrastructure/cdk
+        run: npm run build
+
+      - name: Deploy CDK stack
+        working-directory: infrastructure/cdk
+        run: |
+          # Bootstrap CDK if needed
+          cdk bootstrap || true
+          
+          # Deploy stack
+          cdk deploy --require-approval never --outputs-file outputs.json
+          
+          # Extract outputs
+          cat outputs.json
+
+      - name: Update Vercel environment variables
+        if: success()
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+        run: |
+          # Extract values from CDK outputs
+          SNS_TOPIC_ARN=$(jq -r '.["HawkingEdisonStack-prod"].TaskTopicArn' infrastructure/cdk/outputs.json)
+          ACCESS_KEY_ID=$(jq -r '.["HawkingEdisonStack-prod"].VercelAccessKeyId' infrastructure/cdk/outputs.json)
+          SECRET_ACCESS_KEY=$(jq -r '.["HawkingEdisonStack-prod"].VercelSecretAccessKey' infrastructure/cdk/outputs.json)
+          
+          # Save to GitHub secrets (manual step needed)
+          echo "::notice::Please update these GitHub secrets manually:"
+          echo "::notice::VERCEL_AWS_ACCESS_KEY_ID = $ACCESS_KEY_ID"
+          echo "::notice::VERCEL_AWS_SECRET_ACCESS_KEY = [hidden]"
+          echo "::notice::SNS_TOPIC_ARN = $SNS_TOPIC_ARN"
+
+      - name: Update API keys in Secrets Manager
+        if: success()
+        run: |
+          # Update the secrets with actual values
+          aws secretsmanager update-secret \
+            --secret-id hawking-edison/api-keys \
+            --secret-string '{
+              "SUPABASE_URL": "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}",
+              "SUPABASE_SERVICE_ROLE_KEY": "${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}",
+              "ANTHROPIC_API_KEY": "${{ secrets.ANTHROPIC_API_KEY }}",
+              "OPENAI_API_KEY": "${{ secrets.OPENAI_API_KEY }}"
+            }' || echo "Secret update failed - may need manual update"
