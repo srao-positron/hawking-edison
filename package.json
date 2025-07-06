@@ -24,7 +24,9 @@
     "deploy:check": "tsx utils/test-api-endpoints.ts",
     "deploy:manual": "tsx utils/deployment/deploy-edge-functions.ts",
     "test:auth": "tsx utils/test-auth.ts",
-    "test:llm": "tsx utils/test-llm-keys.ts"
+    "test:llm": "tsx utils/test-llm-keys.ts",
+    "test:lambda": "cd infrastructure/cdk/lambda && tsx ../../../utils/test-lambda-local.ts",
+    "test:lambda:all": "cd infrastructure/cdk/lambda && tsx ../../../utils/test-lambda-local.ts all"
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.840.0",

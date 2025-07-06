@@ -1,16 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/utils/supabase/server'
+import { createClient } from '@/lib/supabase-server'
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 import { z } from 'zod'
 
 // Initialize SNS client
-const snsClient = new SNSClient({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-})
+const snsClient = process.env.AWS_ACCESS_KEY_ID && process.env.AWS_SECRET_ACCESS_KEY
+  ? new SNSClient({
+      region: process.env.AWS_REGION || 'us-east-2',
+      credentials: {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+      },
+    })
+  : null
 
 // Task schema
 const taskSchema = z.object({
@@ -56,44 +58,50 @@ export async function POST(request: NextRequest) {
     }
 
     // Send task to SNS for processing
-    try {
-      const message = {
-        id: task.id,
-        userId: user.id,
-        type: task.type,
-        config: task.config,
-        createdAt: task.created_at,
+    if (snsClient && process.env.SNS_TOPIC_ARN) {
+      try {
+        const message = {
+          id: task.id,
+          userId: user.id,
+          type: task.type,
+          config: task.config,
+          createdAt: task.created_at,
+        }
+
+        const command = new PublishCommand({
+          TopicArn: process.env.SNS_TOPIC_ARN,
+          Message: JSON.stringify(message),
+          MessageAttributes: {
+            taskType: {
+              DataType: 'String',
+              StringValue: task.type,
+            },
+            userId: {
+              DataType: 'String',
+              StringValue: user.id,
+            },
+          },
+        })
+
+        await snsClient.send(command)
+      } catch (snsError) {
+        console.error('SNS error:', snsError)
+        
+        // Update task status to failed
+        await supabase
+          .from('tasks')
+          .update({ status: 'failed', error: 'Failed to queue task' })
+          .eq('id', task.id)
+
+        return NextResponse.json(
+          { error: 'Failed to queue task for processing' },
+          { status: 500 }
+        )
       }
-
-      const command = new PublishCommand({
-        TopicArn: process.env.SNS_TOPIC_ARN!,
-        Message: JSON.stringify(message),
-        MessageAttributes: {
-          taskType: {
-            DataType: 'String',
-            StringValue: task.type,
-          },
-          userId: {
-            DataType: 'String',
-            StringValue: user.id,
-          },
-        },
-      })
-
-      await snsClient.send(command)
-    } catch (snsError) {
-      console.error('SNS error:', snsError)
-      
-      // Update task status to failed
-      await supabase
-        .from('tasks')
-        .update({ status: 'failed', error: 'Failed to queue task' })
-        .eq('id', task.id)
-
-      return NextResponse.json(
-        { error: 'Failed to queue task for processing' },
-        { status: 500 }
-      )
+    } else {
+      // If SNS is not configured, just log a warning
+      console.warn('SNS not configured - task will remain in pending state')
+      console.log('Task created:', task.id)
     }
 
     // Return task details

@@ -11,22 +11,8 @@ import * as dotenv from 'dotenv'
 dotenv.config({ path: '.env.local' })
 
 // Mock secrets
-process.env.SECRETS_ARN = 'mock-secrets-arn'
-process.env.AWS_REGION = 'us-east-1'
-
-// Mock AWS Secrets Manager
-jest.mock('@aws-sdk/client-secrets-manager', () => ({
-  SecretsManager: jest.fn().mockImplementation(() => ({
-    getSecretValue: jest.fn().mockResolvedValue({
-      SecretString: JSON.stringify({
-        SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-        SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
-        ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
-        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-      }),
-    }),
-  })),
-}))
+process.env.SECRETS_ARN = 'arn:aws:secretsmanager:us-east-2:600771336675:secret:hawking-edison/api-keys-eVJEgR'
+process.env.AWS_REGION = 'us-east-2'
 
 async function testLambda() {
   console.log('🧪 Testing Lambda function locally...\n')
