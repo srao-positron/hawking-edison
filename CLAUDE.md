@@ -262,6 +262,23 @@ Can LLM figure this out with existing tools?
     └─ No → Add a simple tool (not a feature!)
 ```
 
+### Claude Code Helper - Use CodeLlama for Code Generation!
+
+**IMPORTANT**: Use the Claude Code Helper for routine coding tasks:
+
+```bash
+# Generate boilerplate
+npx tsx utils/claude-code-helper.ts generate edge-function myFunction
+
+# Fix tests
+npx tsx utils/claude-code-helper.ts fix-test "e2e/auth.spec.ts" "error message"
+
+# Custom generation
+npx tsx utils/claude-code-helper.ts custom "Create a React hook for..."
+```
+
+This saves Opus tokens for architecture and design decisions!
+
 ### Three Killer Demos
 1. **Business Decision**: "Should OpenAI buy Anthropic?"
 2. **Code Review**: "Review this PR: [URL]"

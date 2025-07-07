@@ -335,3 +335,41 @@ This prevents email bouncebacks and maintains our sender reputation.
 - Error messages
 
 **Never push UI changes without updating tests!**
+
+---
+
+## Rule 15: Use Claude Code Helper for Code Generation
+
+**ALWAYS use the Claude Code Helper tool with CodeLlama for routine code tasks:**
+
+```bash
+# Check if CodeLlama is available
+npx tsx utils/claude-code-helper.ts check
+
+# Generate boilerplate code
+npx tsx utils/claude-code-helper.ts generate edge-function myFunction
+npx tsx utils/claude-code-helper.ts generate react-component MyComponent
+npx tsx utils/claude-code-helper.ts generate test my-feature
+npx tsx utils/claude-code-helper.ts generate api-endpoint createUser
+
+# Fix failing tests
+npx tsx utils/claude-code-helper.ts fix-test "e2e/auth.spec.ts" "TimeoutError"
+
+# Custom code generation
+npx tsx utils/claude-code-helper.ts custom "Create a debounce hook"
+```
+
+**When to use Claude Code Helper:**
+- Generating boilerplate code
+- Creating new components/functions
+- Fixing test failures
+- Writing repetitive code
+- Implementing standard patterns
+
+**When NOT to use Claude Code Helper:**
+- Architecture decisions
+- Complex business logic
+- Security-critical code
+- Novel algorithms
+
+**This saves Opus tokens for high-level thinking!**
