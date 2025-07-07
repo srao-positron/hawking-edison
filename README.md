@@ -1,6 +1,9 @@
 # Hawking Edison v2
 ## LLM-Orchestrated Multi-Agent Intelligence
 
+[![Deploy All](https://github.com/srao-positron/hawking-edison/actions/workflows/deploy-all.yml/badge.svg)](https://github.com/srao-positron/hawking-edison/actions/workflows/deploy-all.yml)
+[![Tests](https://github.com/srao-positron/hawking-edison/actions/workflows/test.yml/badge.svg)](https://github.com/srao-positron/hawking-edison/actions/workflows/test.yml)
+
 ### ⚠️ DEVELOPERS: Read DEVELOPMENT_RULES.md First!
 Before contributing, you MUST read [DEVELOPMENT_RULES.md](DEVELOPMENT_RULES.md). It contains mandatory rules that apply to all development.
 

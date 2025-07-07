@@ -1,10 +1,10 @@
 name: Run Tests
 
 on:
-  push:
-    branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
+  workflow_call:  # Allow this to be called by other workflows
 
 jobs:
   test-auth:

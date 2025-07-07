@@ -1,12 +1,8 @@
 name: Deploy AWS Infrastructure
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'infrastructure/cdk/**'
-      - '.github/workflows/deploy-infrastructure.yml'
   workflow_dispatch:
+  workflow_call:  # Allow this to be called by other workflows
 
 jobs:
   deploy-cdk:

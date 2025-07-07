@@ -1,13 +1,13 @@
 name: Deploy Edge Functions
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'supabase/functions/**'
-      - '.github/workflows/deploy-edge-functions.yml'
   workflow_dispatch:
+    inputs:
+      deploy_function:
+        description: 'Specific function to deploy (leave empty for all)'
+        required: false
+        type: string
+  workflow_call:  # Allow this to be called by other workflows
     inputs:
       deploy_function:
         description: 'Specific function to deploy (leave empty for all)'
