@@ -1,12 +1,12 @@
-# Claude Code Helper - Local Code Generation with CodeLlama
+# Claude Code Helper - Local Code Generation with DeepSeek/CodeLlama
 
 ## Overview
 
-The Claude Code Helper is a local development tool that allows Claude Code to generate code using CodeLlama, saving Opus tokens for higher-level architecture and design tasks.
+The Claude Code Helper is a local development tool that allows Claude Code to generate code using DeepSeek Coder or CodeLlama, saving Opus tokens for higher-level architecture and design tasks.
 
 ## Purpose
 
-- **Save Opus tokens**: Use local CodeLlama for repetitive code generation
+- **Save Opus tokens**: Use local DeepSeek/CodeLlama for repetitive code generation
 - **Speed up development**: Generate boilerplate code instantly
 - **Fix tests automatically**: Analyze and fix failing tests
 - **Refactor code**: Improve existing code patterns
@@ -14,8 +14,12 @@ The Claude Code Helper is a local development tool that allows Claude Code to ge
 ## Installation
 
 1. Install Ollama: https://ollama.ai
-2. Pull CodeLlama 70B model:
+2. Pull one or both models:
    ```bash
+   # DeepSeek Coder (faster, 3.8GB)
+   ollama pull deepseek-coder:6.7b
+   
+   # CodeLlama 70B (more powerful, 38GB)
    ollama pull codellama:70b
    ```
 
@@ -81,10 +85,11 @@ npx tsx utils/claude-code-helper.ts custom "Create a React hook for debouncing i
 
 ## Benefits
 
-1. **Token Efficiency**: Uses local CodeLlama instead of Opus for routine tasks
+1. **Token Efficiency**: Uses local models instead of Opus for routine tasks
 2. **Speed**: Instant code generation without API calls
 3. **Consistency**: Generates code following project patterns
-4. **Learning**: CodeLlama understands the codebase context
+4. **Model Choice**: Use DeepSeek for speed or CodeLlama for complexity
+5. **Long Operations**: Handles code generation that takes several minutes
 
 ## Best Practices
 
@@ -97,7 +102,14 @@ npx tsx utils/claude-code-helper.ts custom "Create a React hook for debouncing i
 ## Integration with Claude Code Workflow
 
 1. **Architecture & Design**: Use Opus (Claude Code)
-2. **Implementation**: Use CodeLlama (Claude Code Helper)
+2. **Implementation**: Use DeepSeek/CodeLlama (Claude Code Helper)
 3. **Review & Refinement**: Use Opus (Claude Code)
+
+## Model Selection
+
+- **DeepSeek Coder 6.7B**: Fast, good for simple tasks, smaller model
+- **CodeLlama 70B**: More powerful, better for complex generation
+
+The helper automatically detects and uses available models, preferring DeepSeek for speed.
 
 This tool is specifically for Claude Code's use during development sessions to maximize efficiency and token usage.

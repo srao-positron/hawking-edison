@@ -29,12 +29,25 @@ interface CodeResponse {
 }
 
 class ClaudeCodeHelper {
-  private ollamaModel = 'codellama:70b'
+  private ollamaModel = 'deepseek-coder:6.7b' // Use DeepSeek as default
   
   async checkOllama(): Promise<boolean> {
     try {
       const { stdout } = await execAsync('ollama list')
-      return stdout.includes('codellama')
+      const hasDeepSeek = stdout.includes('deepseek-coder')
+      const hasCodeLlama = stdout.includes('codellama')
+      
+      if (hasDeepSeek) {
+        console.log('✅ Using DeepSeek Coder')
+        this.ollamaModel = 'deepseek-coder:6.7b'
+      } else if (hasCodeLlama) {
+        console.log('✅ Using CodeLlama')
+        this.ollamaModel = 'codellama:70b'
+      } else {
+        console.error('❌ No supported model found. Install deepseek-coder or codellama')
+        return false
+      }
+      return true
     } catch {
       console.error('❌ Ollama not found. Please install: https://ollama.ai')
       return false
@@ -53,10 +66,15 @@ class ClaudeCodeHelper {
     try {
       const prompt = this.buildPrompt(request)
       
-      // Call Ollama with CodeLlama
-      const { stdout } = await execAsync(
+      // Call Ollama with timeout handling for long operations
+      console.log('🔄 Generating code... This may take a few minutes.')
+      
+      const { stdout, stderr } = await execAsync(
         `echo '${prompt.replace(/'/g, "'\\''")}' | ollama run ${this.ollamaModel}`,
-        { maxBuffer: 10 * 1024 * 1024 } // 10MB buffer
+        { 
+          maxBuffer: 50 * 1024 * 1024, // 50MB buffer for larger outputs
+          timeout: 5 * 60 * 1000 // 5 minute timeout
+        }
       )
 
       // Extract code from response
@@ -212,22 +230,24 @@ async function main() {
   
   if (args.length === 0) {
     console.log(`
-Claude Code Helper - Local code generation with CodeLlama
+Claude Code Helper - Local code generation with DeepSeek/CodeLlama
 
 Usage:
   npx tsx utils/claude-code-helper.ts <command> [options]
 
 Commands:
-  check                     Check if Ollama/CodeLlama is available
+  check                     Check if Ollama models are available
   generate <type> <name>    Generate boilerplate code
   fix-test <path> <error>   Fix a failing test
   custom <prompt>           Generate code from custom prompt
+  model <name>              Switch between models (deepseek-coder:6.7b or codellama:70b)
 
 Examples:
   npx tsx utils/claude-code-helper.ts check
   npx tsx utils/claude-code-helper.ts generate edge-function processPayment
   npx tsx utils/claude-code-helper.ts fix-test "e2e/auth.spec.ts" "TimeoutError"
   npx tsx utils/claude-code-helper.ts custom "Create a utility to parse CSV files"
+  npx tsx utils/claude-code-helper.ts model deepseek-coder:6.7b
 `)
     return
   }
@@ -237,7 +257,15 @@ Examples:
   switch (command) {
     case 'check':
       const ready = await helper.checkOllama()
-      console.log(ready ? '✅ CodeLlama is ready!' : '❌ CodeLlama not found')
+      break
+      
+    case 'model':
+      if (commandArgs.length < 1) {
+        console.error('Usage: model <name>')
+        process.exit(1)
+      }
+      helper.ollamaModel = commandArgs[0]
+      console.log(`✅ Switched to model: ${commandArgs[0]}`)
       break
 
     case 'generate':
