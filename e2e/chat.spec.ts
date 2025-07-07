@@ -10,10 +10,18 @@ const TEST_USER = JSON.parse(fs.readFileSync(testUserPath, 'utf-8'))
 async function loginAsTestUser(page: Page) {
   // Login with existing test user
   await page.goto('/auth/login')
+  
+  // Wait for login page to load
+  await expect(page.locator('h1:has-text("Welcome back!")')).toBeVisible({ timeout: 10000 })
+  
   await page.fill('input[placeholder="your@email.com"]', TEST_USER.email)
   await page.fill('input[type="password"]', TEST_USER.password)
-  await page.click('button[type="submit"]')
-  await page.waitForURL('**/chat', { timeout: 20000 })
+  
+  // Submit and wait for navigation
+  await Promise.all([
+    page.waitForNavigation({ url: '**/chat', waitUntil: 'networkidle' }),
+    page.click('button[type="submit"]')
+  ])
 }
 
 test.describe('Chat Interface', () => {
@@ -23,7 +31,7 @@ test.describe('Chat Interface', () => {
 
   test('displays welcome message when no messages', async ({ page }) => {
     // Should show welcome message
-    await expect(page.locator('text="What can I help you with today?"')).toBeVisible()
+    await expect(page.locator('text="What can I help you with today?"')).toBeVisible({ timeout: 10000 })
   })
 
   test('sidebar shows new chat button', async ({ page }) => {
