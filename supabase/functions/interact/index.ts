@@ -20,6 +20,7 @@ interface InteractRequest {
   provider?: LLMProvider
   context?: {
     conversationId?: string
+    sessionId?: string // Chat thread ID
     [key: string]: any
   }
   mode?: 'sync' | 'async' // Default to async for long-running operations
@@ -122,6 +123,64 @@ Deno.serve(async (req) => {
     }
 
     // Fallback to synchronous processing for simple requests
+    // Handle chat thread
+    let threadId = context?.sessionId
+    let messages: any[] = []
+    
+    // Create or get thread
+    if (!threadId) {
+      // Create new thread
+      const { data: thread, error: threadError } = await supabase
+        .from('chat_threads')
+        .insert({
+          user_id: user!.id,
+          metadata: {}
+        })
+        .select()
+        .single()
+      
+      if (threadError) {
+        logger.error('Failed to create thread', threadError)
+        return createErrorResponse('DB_ERROR', 'Failed to create chat thread')
+      }
+      
+      threadId = thread.id
+    } else {
+      // Get existing thread messages
+      const { data: existingMessages, error: messagesError } = await supabase
+        .from('chat_messages')
+        .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true })
+      
+      if (messagesError) {
+        logger.error('Failed to get messages', messagesError)
+        return createErrorResponse('DB_ERROR', 'Failed to get thread messages')
+      }
+      
+      messages = existingMessages.map(msg => ({
+        role: msg.role,
+        content: msg.content
+      }))
+    }
+    
+    // Add user message to thread
+    const { data: userMessage, error: userMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: threadId,
+        user_id: user!.id,
+        role: 'user',
+        content: input
+      })
+      .select()
+      .single()
+    
+    if (userMsgError) {
+      logger.error('Failed to save user message', userMsgError)
+      return createErrorResponse('DB_ERROR', 'Failed to save message')
+    }
+    
     // Record interaction start
     const { data: interaction, error: dbError } = await supabase
       .from('interactions')
@@ -129,7 +188,8 @@ Deno.serve(async (req) => {
         user_id: user!.id,
         input,
         tool_calls: [],
-        result: {}
+        result: {},
+        metadata: { thread_id: threadId }
       })
       .select()
       .single()
@@ -151,14 +211,15 @@ ${Object.entries(tools).map(([name, tool]) =>
 Always think step by step about how to best accomplish the user's goal.
 Be creative in how you combine tools to solve problems.`
 
-    // Call LLM
-    const messages = [
+    // Call LLM with thread context
+    const llmMessages = [
       { role: 'system' as const, content: systemPrompt },
+      ...messages, // Previous messages in thread
       { role: 'user' as const, content: input }
     ]
 
     const startTime = Date.now()
-    const llmResponse = await llm.complete(messages, { provider })
+    const llmResponse = await llm.complete(llmMessages, { provider })
     const duration = Date.now() - startTime
 
     logger.info('LLM response received', {
@@ -168,6 +229,22 @@ Be creative in how you combine tools to solve problems.`
       tokens: llmResponse.usage?.totalTokens
     })
 
+    // Save assistant message to thread
+    const { error: assistantMsgError } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: threadId,
+        user_id: user!.id,
+        role: 'assistant',
+        content: llmResponse.content,
+        tokens_used: llmResponse.usage?.totalTokens,
+        model: provider || 'claude-3-opus'
+      })
+    
+    if (assistantMsgError) {
+      logger.error('Failed to save assistant message', assistantMsgError)
+    }
+    
     // Update interaction with result
     await supabase
       .from('interactions')
@@ -182,6 +259,7 @@ Be creative in how you combine tools to solve problems.`
 
     return createResponse({
       interactionId: interaction.id,
+      threadId: threadId,
       response: llmResponse.content,
       usage: llmResponse.usage
     })

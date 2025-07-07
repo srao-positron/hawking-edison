@@ -22,9 +22,16 @@ export default function ChatPage() {
     setCurrentSessionId(crypto.randomUUID())
   }
 
-  const handleSelectChat = (sessionId: string) => {
-    // TODO: Load conversation history for selected chat
-    setCurrentSessionId(sessionId)
+  const handleSelectChat = async (threadId: string) => {
+    try {
+      // Load conversation history for selected thread
+      const { thread, messages } = await api.threads.get(threadId)
+      setCurrentSessionId(threadId)
+    } catch (error) {
+      console.error('Failed to load thread:', error)
+      // If thread not found, start new
+      handleNewChat()
+    }
   }
 
   if (loading) {

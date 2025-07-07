@@ -170,13 +170,51 @@ export const api = {
   // Interact endpoint
   interact: async (input: string, options?: { provider?: string; sessionId?: string }) => {
     const response = await apiClient.post<{
-      data: { interactionId: string; response: string; usage?: any }
+      data: { interactionId: string; threadId: string; response: string; usage?: any }
     }>('/api/interact', { 
       input, 
       provider: options?.provider,
       context: options?.sessionId ? { sessionId: options.sessionId } : undefined
     })
     return response.data
+  },
+
+  // Chat threads endpoints
+  threads: {
+    list: async (limit = 50, offset = 0) => {
+      const response = await apiClient.get<{
+        data: { threads: any[]; total: number }
+      }>(`/api/chat-threads?limit=${limit}&offset=${offset}`)
+      return response.data
+    },
+
+    get: async (threadId: string) => {
+      const response = await apiClient.get<{
+        data: { thread: any; messages: any[] }
+      }>(`/api/chat-threads/${threadId}`)
+      return response.data
+    },
+
+    create: async (title?: string, metadata?: any) => {
+      const response = await apiClient.post<{
+        data: { thread: any }
+      }>('/api/chat-threads', { title, metadata })
+      return response.data
+    },
+
+    update: async (threadId: string, updates: { title?: string; metadata?: any }) => {
+      const response = await apiClient.put<{
+        data: { thread: any }
+      }>(`/api/chat-threads/${threadId}`, updates)
+      return response.data
+    },
+
+    delete: async (threadId: string) => {
+      const response = await apiClient.delete<{
+        data: {}
+      }>(`/api/chat-threads/${threadId}`)
+      return response.data
+    }
   },
 
   // Databank endpoints

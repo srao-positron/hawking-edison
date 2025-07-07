@@ -1,16 +1,18 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, MessageSquare } from 'lucide-react'
+import { ChevronDown, MessageSquare, Trash2 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
 
-interface Conversation {
+interface ChatThread {
   id: string
-  title: string
-  createdAt: Date
-  lastMessageAt: Date
+  title: string | null
+  created_at: string
+  updated_at: string
+  message_count: number
+  last_message_at: string | null
 }
 
 interface SidebarProps {
@@ -20,40 +22,41 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: SidebarProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([])
+  const [threads, setThreads] = useState<ChatThread[]>([])
   const [collapsed, setCollapsed] = useState(false)
+  const [loading, setLoading] = useState(true)
   const { user } = useAuth()
 
   useEffect(() => {
-    // TODO: Load conversations from API
-    // For now, using mock data
-    setConversations([
-      {
-        id: '1',
-        title: 'Meta-Intelligence AI Research Guide',
-        createdAt: new Date('2024-01-07'),
-        lastMessageAt: new Date('2024-01-07')
-      },
-      {
-        id: '2',
-        title: 'Local LLMs and Claude Cust Wor...',
-        createdAt: new Date('2024-01-06'),
-        lastMessageAt: new Date('2024-01-06')
-      },
-      {
-        id: '3',
-        title: 'Reading Markdown File',
-        createdAt: new Date('2024-01-05'),
-        lastMessageAt: new Date('2024-01-05')
-      },
-      {
-        id: '4',
-        title: 'AI Simulation Research',
-        createdAt: new Date('2024-01-04'),
-        lastMessageAt: new Date('2024-01-04')
-      }
-    ])
+    loadThreads()
   }, [])
+
+  const loadThreads = async () => {
+    try {
+      setLoading(true)
+      const { threads: data } = await api.threads.list()
+      setThreads(data)
+    } catch (error) {
+      console.error('Failed to load threads:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteThread = async (threadId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (confirm('Delete this conversation?')) {
+      try {
+        await api.threads.delete(threadId)
+        setThreads(threads.filter(t => t.id !== threadId))
+        if (currentSessionId === threadId) {
+          onNewChat()
+        }
+      } catch (error) {
+        console.error('Failed to delete thread:', error)
+      }
+    }
+  }
 
   return (
     <div className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ${
@@ -78,20 +81,39 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: S
               Recents
             </div>
             <div className="space-y-1">
-              {conversations.map((conv) => (
-                <button
-                  key={conv.id}
-                  onClick={() => onSelectChat?.(conv.id)}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
-                    currentSessionId === conv.id ? 'bg-gray-100' : ''
-                  }`}
-                >
-                  <div className="font-medium truncate">{conv.title}</div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {conv.lastMessageAt.toLocaleDateString()}
+              {loading ? (
+                <div className="px-3 py-2 text-sm text-gray-500">Loading...</div>
+              ) : threads.length === 0 ? (
+                <div className="px-3 py-2 text-sm text-gray-500">No conversations yet</div>
+              ) : (
+                threads.map((thread) => (
+                  <div
+                    key={thread.id}
+                    className={`group relative w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
+                      currentSessionId === thread.id ? 'bg-gray-100' : ''
+                    }`}
+                  >
+                    <button
+                      onClick={() => onSelectChat?.(thread.id)}
+                      className="w-full text-left"
+                    >
+                      <div className="font-medium truncate pr-8">
+                        {thread.title || 'Untitled conversation'}
+                      </div>
+                      <div className="text-xs text-gray-500 mt-0.5">
+                        {new Date(thread.updated_at).toLocaleDateString()}
+                        {thread.message_count > 0 && ` • ${thread.message_count} messages`}
+                      </div>
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteThread(thread.id, e)}
+                      className="absolute right-2 top-2.5 opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
+                    >
+                      <Trash2 className="w-3 h-3 text-gray-500" />
+                    </button>
                   </div>
-                </button>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
