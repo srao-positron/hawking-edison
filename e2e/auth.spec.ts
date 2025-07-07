@@ -104,7 +104,7 @@ test.describe('Authentication Flow', () => {
     })
     
     // 5. Verify we're logged in by checking the chat interface is visible
-    await expect(page.locator('h1:has-text("Hawking Edison")')).toBeVisible({ timeout: 10000 })
+    await expect(page.locator('text="What can I help you with today?"')).toBeVisible({ timeout: 10000 })
   })
 
   test('login with invalid credentials', async ({ page }) => {

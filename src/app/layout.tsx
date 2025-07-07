@@ -20,10 +20,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <MantineProvider>
-          <Navigation />
-          {children}
-        </MantineProvider>
+        {children}
       </body>
     </html>
   );

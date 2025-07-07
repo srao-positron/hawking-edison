@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import ChatInterface from '@/components/ChatInterface'
+import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
 
 export default function ChatPage() {
   const { user, loading } = useAuth()
@@ -17,9 +17,14 @@ export default function ChatPage() {
     }
   }, [user, loading, router])
 
-  const handleNewSession = () => {
+  const handleNewChat = () => {
     // Generate new session ID and reset messages
     setCurrentSessionId(crypto.randomUUID())
+  }
+
+  const handleSelectChat = (sessionId: string) => {
+    // TODO: Load conversation history for selected chat
+    setCurrentSessionId(sessionId)
   }
 
   if (loading) {
@@ -37,5 +42,16 @@ export default function ChatPage() {
     return null
   }
 
-  return <ChatInterface sessionId={currentSessionId} onNewSession={handleNewSession} />
+  return (
+    <div className="flex h-screen">
+      <Sidebar 
+        currentSessionId={currentSessionId} 
+        onNewChat={handleNewChat}
+        onSelectChat={handleSelectChat}
+      />
+      <div className="flex-1">
+        <ChatInterface sessionId={currentSessionId} />
+      </div>
+    </div>
+  )
 }
