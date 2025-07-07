@@ -168,10 +168,14 @@ export const apiClient = new ApiClient()
 // Export specific API methods
 export const api = {
   // Interact endpoint
-  interact: async (input: string, provider?: string) => {
+  interact: async (input: string, options?: { provider?: string; sessionId?: string }) => {
     const response = await apiClient.post<{
       data: { interactionId: string; response: string; usage?: any }
-    }>('/api/interact', { input, provider })
+    }>('/api/interact', { 
+      input, 
+      provider: options?.provider,
+      context: options?.sessionId ? { sessionId: options.sessionId } : undefined
+    })
     return response.data
   },
 

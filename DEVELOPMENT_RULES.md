@@ -305,3 +305,33 @@ const testEmail = `test@gmail.com`    // Causes bouncebacks
 **Format**: `sid+he-testing-<feature>-<timestamp>@hawkingedison.com`
 
 This prevents email bouncebacks and maintains our sender reputation.
+
+---
+
+## Rule 14: Update Tests When UI Changes
+
+**ALWAYS update tests when changing the user interface:**
+
+```bash
+# When you change UI components:
+1. Update Playwright tests in e2e/
+2. Update component tests if they exist
+3. Run tests locally BEFORE pushing
+4. Ensure all selectors match new UI
+
+# Example workflow:
+- Change button text from "Submit" to "Send"
+- Update: e2e/auth.spec.ts to look for "Send"
+- Run: npm run test:e2e
+- Verify: All tests pass
+```
+
+**This includes:**
+- Button text changes
+- Form field names/placeholders
+- Navigation changes
+- Element IDs/classes used in tests
+- Page routes
+- Error messages
+
+**Never push UI changes without updating tests!**

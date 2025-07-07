@@ -26,6 +26,12 @@ export default function ChatInterface({ sessionId, onNewSession }: ChatInterface
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Reset messages when sessionId changes
+  useEffect(() => {
+    setMessages([])
+    setIsLoading(false)
+  }, [sessionId])
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
@@ -58,7 +64,7 @@ export default function ChatInterface({ sessionId, onNewSession }: ChatInterface
     setIsLoading(true)
 
     try {
-      const response = await api.interact(input.trim())
+      const response = await api.interact(input.trim(), { sessionId })
       
       const assistantMessage: Message = {
         id: response.interactionId,

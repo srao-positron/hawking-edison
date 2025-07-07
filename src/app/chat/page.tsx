@@ -9,7 +9,7 @@ import { useEffect } from 'react'
 export default function ChatPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [currentSessionId, setCurrentSessionId] = useState<string>()
+  const [currentSessionId, setCurrentSessionId] = useState<string>(crypto.randomUUID())
 
   useEffect(() => {
     if (!loading && !user) {
@@ -18,7 +18,7 @@ export default function ChatPage() {
   }, [user, loading, router])
 
   const handleNewSession = () => {
-    // Generate new session ID
+    // Generate new session ID and reset messages
     setCurrentSessionId(crypto.randomUUID())
   }
 
