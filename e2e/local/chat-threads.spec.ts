@@ -1,10 +1,8 @@
 import { test, expect, Page } from '@playwright/test'
-import * as fs from 'fs'
-import { join } from 'path'
+import { getTestUser } from '../test-user-helper'
 
 // Load dedicated test user
-const testUserPath = join(process.cwd(), '.test-user.json')
-const TEST_USER = JSON.parse(fs.readFileSync(testUserPath, 'utf-8'))
+const TEST_USER = getTestUser()
 
 // Helper to login test user
 async function loginAsTestUser(page: Page) {

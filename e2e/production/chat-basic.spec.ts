@@ -1,10 +1,8 @@
 import { test, expect } from '@playwright/test'
-import * as fs from 'fs'
-import { join } from 'path'
+import { getTestUser } from '../test-user-helper'
 
 // Load dedicated test user
-const testUserPath = join(process.cwd(), '.test-user.json')
-const TEST_USER = JSON.parse(fs.readFileSync(testUserPath, 'utf-8'))
+const TEST_USER = getTestUser()
 
 test.describe('Basic Chat Test', () => {
   test('can login and see chat interface', async ({ page }) => {
