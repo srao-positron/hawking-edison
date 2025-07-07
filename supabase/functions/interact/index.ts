@@ -22,6 +22,7 @@ interface InteractRequest {
     conversationId?: string
     [key: string]: any
   }
+  mode?: 'sync' | 'async' // Default to async for long-running operations
 }
 
 Deno.serve(async (req) => {
@@ -58,7 +59,7 @@ Deno.serve(async (req) => {
 
     // Parse request
     const body: InteractRequest = await req.json()
-    const { input, provider, context } = body
+    const { input, provider, context, mode = 'async' } = body
 
     if (!input || typeof input !== 'string') {
       return createErrorResponse('INVALID_INPUT', 'Input string required')
@@ -68,7 +69,8 @@ Deno.serve(async (req) => {
       requestId,
       userId: user!.id,
       inputLength: input.length,
-      provider: provider || 'default'
+      provider: provider || 'default',
+      mode
     })
 
     // Initialize Supabase client with user context
@@ -77,6 +79,49 @@ Deno.serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
 
+    // Check if we should use async orchestration
+    if (mode === 'async' && Deno.env.get('ENABLE_ORCHESTRATION') === 'true') {
+      // Create orchestration session
+      const { data: session, error: sessionError } = await supabase
+        .from('orchestration_sessions')
+        .insert({
+          user_id: user!.id,
+          status: 'pending',
+          messages: [{
+            role: 'user',
+            content: input
+          }]
+        })
+        .select()
+        .single()
+      
+      if (sessionError) {
+        logger.error('Failed to create orchestration session', sessionError)
+        return createErrorResponse('DB_ERROR', 'Failed to create orchestration session')
+      }
+
+      // Publish to SNS to start orchestration
+      // Note: In Edge Functions, we can't use AWS SDK directly
+      // Instead, we'll use a webhook or mark the session for Lambda to pick up
+      logger.info('Created orchestration session', {
+        sessionId: session.id,
+        userId: user!.id
+      })
+
+      // For now, return the session ID so frontend can subscribe to updates
+      return createResponse({
+        sessionId: session.id,
+        status: 'processing',
+        message: 'Your request is being processed. Subscribe to updates using the session ID.',
+        realtime: {
+          channel: `orchestration:${session.id}`,
+          event: 'orchestration_sessions',
+          filter: `id=eq.${session.id}`
+        }
+      })
+    }
+
+    // Fallback to synchronous processing for simple requests
     // Record interaction start
     const { data: interaction, error: dbError } = await supabase
       .from('interactions')

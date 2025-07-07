@@ -97,4 +97,6 @@ Read [DEVELOPMENT_STANDARDS_V2.md](DEVELOPMENT_STANDARDS_V2.md) first. Remember:
 - ✅ Authentication: Email-based auth with API keys
 - ✅ Monitoring: Health checks and telemetry
 - ✅ Testing: All tests passing (36/42, 6 skipped)
+- ✅ Orchestration Infrastructure: Lambda, SNS, SQS deployed
 - 🚧 Tool Implementation: In progress
+- 🚧 Function Calling: Implementing for Claude and OpenAI
