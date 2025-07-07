@@ -5,6 +5,7 @@ import ChatInterface from '@/components/ChatInterface'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter } from 'next/navigation'
+import { api } from '@/lib/api-client'
 
 export default function ChatPage() {
   const { user, loading } = useAuth()
