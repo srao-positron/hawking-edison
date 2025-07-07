@@ -279,6 +279,33 @@ npx tsx utils/claude-code-helper.ts custom "Create a React hook for..."
 
 This saves Opus tokens for architecture and design decisions!
 
+### Testing Strategy - Local vs Production
+
+**IMPORTANT**: We have separate test suites for development and production:
+
+```bash
+# Testing new features locally
+npm run test:e2e:local
+
+# Testing deployed features (what CI runs)
+npm run test:e2e:prod
+
+# Unit tests
+npm test
+```
+
+**Test Structure:**
+- `e2e/local/` - New features not yet deployed
+- `e2e/production/` - Stable, deployed features
+- `__tests__/` - Unit tests
+
+**Development Workflow:**
+1. Build feature
+2. Write tests in `e2e/local/`
+3. Run `npm run test:e2e:local`
+4. Push when tests pass
+5. After deployment, move tests to `e2e/production/`
+
 ### Three Killer Demos
 1. **Business Decision**: "Should OpenAI buy Anthropic?"
 2. **Code Review**: "Review this PR: [URL]"

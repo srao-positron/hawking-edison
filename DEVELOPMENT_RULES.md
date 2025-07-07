@@ -373,3 +373,36 @@ npx tsx utils/claude-code-helper.ts custom "Create a debounce hook"
 - Novel algorithms
 
 **This saves Opus tokens for high-level thinking!**
+
+---
+
+## Rule 16: Separate Local and Production Tests
+
+**ALWAYS use the appropriate test suite for your context:**
+
+```bash
+# For testing NEW features during development
+npm run test:e2e:local
+
+# For testing DEPLOYED features (CI/CD)
+npm run test:e2e:prod
+
+# For running unit tests
+npm test
+
+# For interactive debugging
+npm run test:e2e:ui
+```
+
+**Test Organization:**
+- `e2e/local/` - Tests for features in development
+- `e2e/production/` - Tests for stable, deployed features
+- `__tests__/` - Unit tests
+
+**When developing:**
+1. Write tests in `e2e/local/` for new features
+2. Run `npm run test:e2e:local` before pushing
+3. Move tests to `e2e/production/` after deployment
+4. CI runs `npm run test:e2e:prod` against deployed app
+
+**Never mix local and production tests!**
