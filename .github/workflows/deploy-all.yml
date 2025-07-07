@@ -13,188 +13,36 @@ jobs:
   # Step 1: Deploy AWS Infrastructure (Lambda, SNS, SQS)
   deploy-infrastructure:
     name: Deploy AWS Infrastructure
-    runs-on: ubuntu-latest
     if: |
       github.event_name == 'workflow_dispatch' ||
       contains(github.event.head_commit.modified, 'infrastructure/') ||
       contains(github.event.head_commit.message, '[infra]')
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: infrastructure/cdk/package-lock.json
-
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Install CDK dependencies
-        working-directory: infrastructure/cdk
-        run: |
-          npm ci
-          npm install -g aws-cdk
-
-      - name: Install Lambda dependencies
-        working-directory: infrastructure/cdk/lambda
-        run: npm ci
-
-      - name: Build CDK
-        working-directory: infrastructure/cdk
-        run: npm run build
-
-      - name: Deploy CDK stack
-        working-directory: infrastructure/cdk
-        run: |
-          cdk bootstrap || true
-          cdk deploy --require-approval never --outputs-file outputs.json
-
-      - name: Export AWS outputs
-        id: aws-outputs
-        run: |
-          echo "deployed=true" >> $GITHUB_OUTPUT
-          # Extract and export any needed values from CDK outputs
-          if [ -f infrastructure/cdk/outputs.json ]; then
-            echo "Infrastructure deployment successful"
-          fi
+    uses: ./.github/workflows/deploy-infrastructure.yml
+    secrets: inherit
 
   # Step 2: Deploy Supabase Edge Functions
   deploy-edge-functions:
     name: Deploy Edge Functions
-    runs-on: ubuntu-latest
     needs: [deploy-infrastructure]
     if: always() && (needs.deploy-infrastructure.result == 'success' || needs.deploy-infrastructure.result == 'skipped')
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Supabase CLI
-        uses: supabase/setup-cli@v1
-        with:
-          version: latest
-
-      - name: Deploy Edge Functions
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-        run: |
-          # Deploy all functions
-          if [ -z "${{ github.event.inputs.deploy_function }}" ]; then
-            echo "Deploying all Edge Functions..."
-            for function_dir in supabase/functions/*; do
-              if [ -d "$function_dir" ] && [ -f "$function_dir/index.ts" ]; then
-                function_name=$(basename "$function_dir")
-                echo "Deploying function: $function_name"
-                supabase functions deploy $function_name --project-ref $SUPABASE_PROJECT_ID
-              fi
-            done
-          else
-            echo "Deploying specific function: ${{ github.event.inputs.deploy_function }}"
-            supabase functions deploy ${{ github.event.inputs.deploy_function }} --project-ref $SUPABASE_PROJECT_ID
-          fi
+    uses: ./.github/workflows/deploy-edge-functions.yml
+    secrets: inherit
 
   # Step 3: Deploy Frontend to Vercel
   deploy-frontend:
     name: Deploy Frontend
-    runs-on: ubuntu-latest
     needs: [deploy-infrastructure, deploy-edge-functions]
     if: always() && needs.deploy-edge-functions.result == 'success'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Build project
-        run: npm run build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-
-      - name: Install Vercel CLI
-        run: npm install --global vercel@latest
-
-      - name: Pull Vercel Environment Information
-        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Build Project Artifacts
-        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
-
-      - name: Deploy to Vercel
-        id: deploy
-        run: |
-          deployment_url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
-          echo "deployment_url=$deployment_url" >> $GITHUB_OUTPUT
-
-      - name: Comment deployment URL
-        if: github.event_name == 'pull_request'
-        uses: actions/github-script@v6
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: '🚀 Deployed to Vercel: ${{ steps.deploy.outputs.deployment_url }}'
-            })
+    uses: ./.github/workflows/deploy-frontend.yml
+    secrets: inherit
 
   # Step 4: Run E2E Tests against deployed environment
   test-deployed:
     name: Test Deployed Environment
-    runs-on: ubuntu-latest
     needs: [deploy-frontend]
     if: always() && needs.deploy-frontend.result == 'success'
-    
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
-
-      - name: Run E2E tests against production
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-          TEST_USER_EMAIL: ${{ secrets.TEST_USER_EMAIL }}
-          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-          CI: true
-        run: npm run test:e2e:prod
-
-      - name: Upload Playwright Report
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: playwright-report
-          path: playwright-report/
-          retention-days: 30
+    uses: ./.github/workflows/test.yml
+    secrets: inherit
 
   # Final notification job
   notify-status:
