@@ -56,21 +56,14 @@ jobs:
           # Extract outputs
           cat outputs.json
 
-      - name: Update Vercel environment variables
+      - name: Display CDK outputs
         if: success()
-        env:
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
         run: |
           # Extract values from CDK outputs
-          SNS_TOPIC_ARN=$(jq -r '.["HawkingEdisonStack-prod"].TaskTopicArn' infrastructure/cdk/outputs.json)
-          ACCESS_KEY_ID=$(jq -r '.["HawkingEdisonStack-prod"].VercelAccessKeyId' infrastructure/cdk/outputs.json)
-          SECRET_ACCESS_KEY=$(jq -r '.["HawkingEdisonStack-prod"].VercelSecretAccessKey' infrastructure/cdk/outputs.json)
+          SECRET_ARN=$(jq -r '.["HawkingEdisonStack-prod"].ApiKeysSecretArn' infrastructure/cdk/outputs.json)
           
-          # Save to GitHub secrets (manual step needed)
-          echo "::notice::Please update these GitHub secrets manually:"
-          echo "::notice::VERCEL_AWS_ACCESS_KEY_ID = $ACCESS_KEY_ID"
-          echo "::notice::VERCEL_AWS_SECRET_ACCESS_KEY = [hidden]"
-          echo "::notice::SNS_TOPIC_ARN = $SNS_TOPIC_ARN"
+          echo "::notice::AWS Secrets Manager ARN: $SECRET_ARN"
+          echo "::notice::Infrastructure deployment successful!"
 
       - name: Update API keys in Secrets Manager
         if: success()
