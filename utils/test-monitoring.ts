@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
 // Test monitoring and telemetry endpoints
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { resolve } from 'path'
 import fetch from 'node-fetch'
+
+// Load environment variables
+config({ path: resolve(__dirname, '../.env.local') })
 import { createClient } from '@supabase/supabase-js'
 import { generateApiKey, hashApiKey } from '../src/lib/api-key-utils'
 
@@ -59,7 +63,7 @@ async function testMonitoringEndpoint() {
 
   // Create test user and API key
   log('Creating test user...', 'yellow')
-  const testEmail = `monitor-test-${Date.now()}@example.com`
+  const testEmail = `sid+he-testing-monitor-${Date.now()}@hawkingedison.com`
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: testEmail,
     password: 'test-password-123',
@@ -172,14 +176,13 @@ async function testTelemetryTracking() {
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY)
 
-  // Check if telemetry_events table exists
-  const { data: tables } = await supabase
-    .from('information_schema.tables')
-    .select('table_name')
-    .eq('table_schema', 'public')
-    .eq('table_name', 'telemetry_events')
+  // Check if telemetry_events table exists by trying to query it
+  const { error: tableCheckError } = await supabase
+    .from('telemetry_events')
+    .select('id')
+    .limit(1)
 
-  if (!tables || tables.length === 0) {
+  if (tableCheckError && tableCheckError.code === '42P01') {
     log('⚠ Telemetry events table not found - migrations may need to be applied', 'yellow')
     return false
   }

@@ -36,7 +36,7 @@ test.describe('Basic Auth Tests', () => {
     await page.goto('/auth/login')
     
     // Try to login with invalid credentials
-    await page.fill('input[placeholder="your@email.com"]', 'invalid@example.com')
+    await page.fill('input[placeholder="your@email.com"]', 'invalid@hawkingedison.com')
     await page.fill('input[type="password"]', 'wrongpassword')
     await page.click('button[type="submit"]')
     

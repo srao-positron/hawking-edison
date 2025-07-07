@@ -161,6 +161,23 @@ export const toolName = {
 - Test no hidden logic
 - Test LLM can use creatively
 
+#### Test Email Addresses
+**IMPORTANT**: Always use @hawkingedison.com domain for test emails to avoid bouncebacks:
+```typescript
+// ✅ CORRECT - Use hawkingedison.com domain
+const testEmail = `sid+he-testing-${Date.now()}@hawkingedison.com`
+
+// ❌ WRONG - Don't use these domains
+const testEmail = `test@example.com`  // Blocked by Supabase
+const testEmail = `test@gmail.com`    // Causes bouncebacks
+```
+
+Format: `sid+he-testing-<feature>-<timestamp>@hawkingedison.com`
+- Example: `sid+he-testing-auth-1706543210123@hawkingedison.com`
+- Example: `sid+he-testing-apikey-1706543210123@hawkingedison.com`
+
+This prevents Supabase email bouncebacks and keeps our sender reputation clean.
+
 ### Common Patterns
 
 #### Pattern: Let LLM Decide Agent Count

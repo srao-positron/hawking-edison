@@ -13,7 +13,7 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-const testEmail = `test-${Date.now()}@example.com`
+const testEmail = `sid+he-testing-auth-${Date.now()}@hawkingedison.com`
 const testPassword = 'TestPassword123!'
 
 console.log('🧪 Testing Supabase Auth flows...\n')

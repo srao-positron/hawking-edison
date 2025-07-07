@@ -32,7 +32,7 @@ async function testApiKeyAuth() {
 
   // Create test user
   log('Creating test user...', 'yellow')
-  const testEmail = `api-test-${Date.now()}@example.com`
+  const testEmail = `sid+he-testing-apikey-${Date.now()}@hawkingedison.com`
   const { data: authData, error: authError } = await supabase.auth.admin.createUser({
     email: testEmail,
     password: 'test-password-123',

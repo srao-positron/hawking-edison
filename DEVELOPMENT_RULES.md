@@ -233,3 +233,75 @@ After coding:
 ```
 
 **Remember: These aren't suggestions. They're requirements.**
+
+---
+
+## Rule 11: Delete Old Code - No Dead Code
+
+**ALWAYS delete old, unused code when replacing features:**
+
+```bash
+# When replacing a feature:
+1. Build the new feature
+2. Verify it works with tests
+3. DELETE all old code immediately
+4. Push the clean version
+
+# Examples:
+- Old UI replaced? Delete ALL old components
+- New API? Delete deprecated endpoints
+- Changed architecture? Remove obsolete patterns
+- New auth system? Delete old auth code
+```
+
+**NEVER keep "just in case" code:**
+- Git history exists for a reason
+- Dead code confuses developers
+- Commented-out code is forbidden
+- Multiple versions of same feature forbidden
+
+**Before pushing, ask yourself:**
+- "Is there any dead code?"
+- "Did I delete the old implementation?"
+- "Are there unused files?"
+
+---
+
+## Rule 12: No Pushing with Failing Tests
+
+**NEVER push code with failing tests:**
+
+```bash
+# Before EVERY push:
+npm run test:e2e  # Must pass
+npm run test      # Must pass
+npm run lint      # Must pass
+npm run typecheck # Must pass
+
+# If tests fail:
+1. Fix the issue
+2. Run tests again
+3. Only push when GREEN
+```
+
+**This is why we have pre-push hooks. Respect them.**
+
+---
+
+## Rule 13: Test Email Addresses
+
+**ALWAYS use @hawkingedison.com domain for test emails:**
+
+```typescript
+// ✅ CORRECT
+const testEmail = `sid+he-testing-${Date.now()}@hawkingedison.com`
+const testEmail = `sid+he-testing-auth-${timestamp}@hawkingedison.com`
+
+// ❌ WRONG - These cause bouncebacks
+const testEmail = `test@example.com`  // Blocked by Supabase
+const testEmail = `test@gmail.com`    // Causes bouncebacks
+```
+
+**Format**: `sid+he-testing-<feature>-<timestamp>@hawkingedison.com`
+
+This prevents email bouncebacks and maintains our sender reputation.

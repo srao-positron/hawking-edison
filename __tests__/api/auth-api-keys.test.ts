@@ -7,7 +7,7 @@ const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || ''
 const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || ''
 
 // Test user credentials
-const TEST_EMAIL = 'apikey-test@example.com'
+const TEST_EMAIL = `sid+he-testing-jest-${Date.now()}@hawkingedison.com`
 const TEST_PASSWORD = 'test-password-123'
 
 describe('API Key Authentication', () => {
