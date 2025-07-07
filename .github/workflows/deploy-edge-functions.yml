@@ -36,52 +36,19 @@ jobs:
         with:
           version: latest
 
-      - name: Link Supabase Project
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: bknpldydmkzupsfagnva
-        run: |
-          # Link to project (this creates the necessary config)
-          supabase link --project-ref $SUPABASE_PROJECT_ID
-          
       - name: Deploy Edge Functions
-        env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: bknpldydmkzupsfagnva
-        run: |
-          # Deploy specific function or all functions
-          if [ -n "${{ github.event.inputs.deploy_function }}" ]; then
-            echo "Deploying specific function: ${{ github.event.inputs.deploy_function }}"
-            supabase functions deploy ${{ github.event.inputs.deploy_function }}
-          else
-            echo "Deploying all functions..."
-            # Deploy each function individually
-            for function in interact databank memories auth-api-keys chat-threads; do
-              echo "Deploying $function..."
-              supabase functions deploy $function
-            done
-          fi
-
-      - name: Set Function Secrets
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
           SUPABASE_PROJECT_ID: bknpldydmkzupsfagnva
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         run: |
-          echo "Setting Edge Function secrets..."
-          
-          # Create secrets file
-          cat > .env.functions <<EOF
-          ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY
-          OPENAI_API_KEY=$OPENAI_API_KEY
-          EOF
-          
-          # Set secrets for all functions
-          supabase secrets set --env-file .env.functions
-          
-          # Clean up
-          rm .env.functions
+          # Use the deployment script that we know works
+          if [ -n "${{ github.event.inputs.deploy_function }}" ]; then
+            npm run deploy:functions -- ${{ github.event.inputs.deploy_function }}
+          else
+            npm run deploy:functions
+          fi
 
       - name: Test Deployed Functions
         run: |

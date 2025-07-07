@@ -9,7 +9,7 @@ import { execSync } from 'child_process'
 config({ path: join(process.cwd(), '.env.local') })
 
 const PROJECT_ID = 'bknpldydmkzupsfagnva'
-const FUNCTIONS = ['interact', 'databank', 'memories', 'auth-api-keys']
+const FUNCTIONS = ['interact', 'databank', 'memories', 'auth-api-keys', 'chat-threads']
 
 // Check requirements
 function checkRequirements() {
