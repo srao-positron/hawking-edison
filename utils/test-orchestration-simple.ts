@@ -24,23 +24,10 @@ async function testOrchestration() {
   console.log('🔄 Testing orchestration infrastructure...\n')
 
   try {
-    // 1. First get a real user ID from the database
-    console.log('1️⃣ Getting test user...')
-    const { data: users, error: userError } = await supabase
-      .from('api_keys')
-      .select('user_id')
-      .limit(1)
+    // 1. Create a test orchestration session with a dummy user ID
+    console.log('1️⃣ Creating test orchestration session...')
+    const testUserId = 'a0000000-0000-0000-0000-000000000001' // Dummy UUID
     
-    if (userError || !users || users.length === 0) {
-      console.error('❌ No users found in database')
-      return
-    }
-    
-    const testUserId = users[0].user_id
-    console.log('   Using test user:', testUserId)
-    
-    // 2. Create a test orchestration session
-    console.log('\n2️⃣ Creating test orchestration session...')
     const { data: session, error: sessionError } = await supabase
       .from('orchestration_sessions')
       .insert({
@@ -48,7 +35,7 @@ async function testOrchestration() {
         status: 'pending',
         messages: [{
           role: 'user',
-          content: 'Test orchestration request'
+          content: 'Test orchestration request: What is 2+2?'
         }]
       })
       .select()
@@ -61,9 +48,11 @@ async function testOrchestration() {
 
     console.log('✅ Created session:', session.id)
     console.log('   Status:', session.status)
+    console.log('   Messages:', JSON.stringify(session.messages))
 
-    // 3. Wait a moment for poller to pick it up
-    console.log('\n3️⃣ Waiting for poller to process (up to 2 minutes)...')
+    // 2. Wait a moment for poller to pick it up
+    console.log('\n2️⃣ Waiting for poller to process (up to 2 minutes)...')
+    console.log('   Note: The poller Lambda runs every minute\n')
     
     let attempts = 0
     let currentStatus = 'pending'
@@ -73,7 +62,7 @@ async function testOrchestration() {
       
       const { data: updatedSession, error: fetchError } = await supabase
         .from('orchestration_sessions')
-        .select('status, final_response, error')
+        .select('status, final_response, error, execution_count')
         .eq('id', session.id)
         .single()
 
@@ -85,13 +74,18 @@ async function testOrchestration() {
       if (updatedSession.status !== currentStatus) {
         currentStatus = updatedSession.status
         console.log(`   Status changed to: ${currentStatus}`)
+        if (updatedSession.execution_count > 0) {
+          console.log(`   Execution count: ${updatedSession.execution_count}`)
+        }
+      } else {
+        process.stdout.write('.')
       }
 
       attempts++
     }
 
-    // 4. Check final status
-    console.log('\n4️⃣ Final results:')
+    // 3. Check final status
+    console.log('\n\n3️⃣ Final results:')
     const { data: finalSession, error: finalError } = await supabase
       .from('orchestration_sessions')
       .select('*')
@@ -109,24 +103,53 @@ async function testOrchestration() {
     console.log('   Messages:', finalSession.messages.length)
     
     if (finalSession.final_response) {
-      console.log('   Response:', finalSession.final_response)
+      console.log('   ✅ Response:', finalSession.final_response)
     }
     
     if (finalSession.error) {
-      console.log('   Error:', finalSession.error)
+      console.log('   ❌ Error:', finalSession.error)
     }
 
-    // 5. Check for tool executions
+    // 4. Check for tool executions
     const { data: toolExecutions, error: toolError } = await supabase
       .from('tool_executions')
       .select('*')
       .eq('session_id', session.id)
 
     if (!toolError && toolExecutions && toolExecutions.length > 0) {
-      console.log('\n5️⃣ Tool executions:')
+      console.log('\n4️⃣ Tool executions:')
       toolExecutions.forEach((exec, i) => {
         console.log(`   ${i + 1}. ${exec.tool_name} - ${exec.status}`)
+        if (exec.duration_ms) {
+          console.log(`      Duration: ${exec.duration_ms}ms`)
+        }
       })
+    } else {
+      console.log('\n4️⃣ No tool executions found')
+    }
+
+    // 5. Test that the interact Edge Function can create sessions
+    console.log('\n5️⃣ Testing Edge Function orchestration mode...')
+    const response = await fetch(`${supabaseUrl}/functions/v1/interact`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${supabaseServiceKey}`
+      },
+      body: JSON.stringify({
+        input: 'Test from Edge Function: What is the capital of France?',
+        mode: 'async'
+      })
+    })
+
+    if (response.ok) {
+      const result = await response.json()
+      console.log('   Edge Function response:', result)
+      if (result.data?.sessionId) {
+        console.log('   ✅ Async session created:', result.data.sessionId)
+      }
+    } else {
+      console.log('   ❌ Edge Function error:', await response.text())
     }
 
     // 6. Clean up test data

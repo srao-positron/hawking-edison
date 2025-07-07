@@ -54,3 +54,6 @@ infrastructure/cdk/outputs.json
 infrastructure/cdk/cdk.out/
 infrastructure/cdk/dist/
 aws-credentials.txt
+
+# Test user credentials
+.test-user.json

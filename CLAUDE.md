@@ -400,3 +400,25 @@ Key rules include:
 8. No types or templates
 
 **If you haven't read DEVELOPMENT_RULES.md yet, READ IT NOW.**
+
+### Test User for Automated Testing
+
+A dedicated test user is available for all automated tests:
+
+```json
+{
+  "email": "test@hawkingedison.com",
+  "password": "TestUser123!@#",
+  "userId": "0b9fcefa-ba51-470b-b787-5a41f329be25",
+  "apiKey": "Create via API key management page"
+}
+```
+
+**To create an API key for this user:**
+1. Sign in as test@hawkingedison.com
+2. Go to /api-keys
+3. Create a new API key named "Automated Testing"
+4. Update .test-user.json with the key
+
+This user is stored in `.test-user.json` (git-ignored).
+Use this for all automated testing to avoid email rate limits.
