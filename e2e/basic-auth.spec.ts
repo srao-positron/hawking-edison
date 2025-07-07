@@ -4,12 +4,12 @@ test.describe('Basic Auth Tests', () => {
   test('home page loads', async ({ page }) => {
     await page.goto('/')
     
-    // Check if page loads at all
-    await expect(page).toHaveTitle(/Hawking Edison/)
+    // Home page redirects to login when not authenticated
+    await page.waitForURL('**/auth/login', { timeout: 10000 })
     
-    // Look for main heading - be more specific
-    const heading = page.locator('h1').first()
-    await expect(heading).toContainText('Hawking Edison')
+    // Check if we're on the login page
+    await expect(page).toHaveTitle(/Hawking Edison/)
+    await expect(page.locator('text=Welcome back!')).toBeVisible()
   })
 
   test('can navigate to login page', async ({ page }) => {

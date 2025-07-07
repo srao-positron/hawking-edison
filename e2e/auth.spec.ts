@@ -95,15 +95,16 @@ test.describe('Authentication Flow', () => {
     // 3. Submit form
     await page.click('button[type="submit"]')
     
-    // 4. Should redirect to home page which then redirects to chat
-    // Wait for any navigation first
-    await page.waitForLoadState('networkidle')
+    // 4. Wait for redirect to chat page
+    // The login redirects to /chat which then redirects to / and back to /chat
+    // So we need to be patient and wait for the final destination
+    await page.waitForURL('**/chat', { 
+      timeout: 20000,
+      waitUntil: 'load' 
+    })
     
-    // Then wait for the final URL
-    await page.waitForURL('**/chat', { timeout: 15000 })
-    
-    // 5. Verify we're logged in by checking the page
-    await expect(page.locator('h1').first()).toContainText('Hawking Edison')
+    // 5. Verify we're logged in by checking the chat interface is visible
+    await expect(page.locator('h1:has-text("Hawking Edison")')).toBeVisible({ timeout: 10000 })
   })
 
   test('login with invalid credentials', async ({ page }) => {
@@ -218,11 +219,12 @@ test.describe('Authentication Flow', () => {
 
   test('protected route redirect', async ({ page }) => {
     // Try to access a protected route while logged out
-    await page.goto('/')
+    await page.goto('/chat')
     
-    // Should redirect to login (if route is protected)
-    // Note: Adjust this based on your actual route protection logic
-    // For now, we'll just verify the page loads
-    await expect(page.locator('h1').first()).toContainText('Hawking Edison')
+    // Should redirect to login page via home page redirect
+    await page.waitForURL('**/auth/login', { timeout: 10000 })
+    
+    // Verify we're on the login page
+    await expect(page.locator('text=Welcome back!')).toBeVisible()
   })
 })

@@ -3,17 +3,16 @@ import { test, expect } from '@playwright/test'
 test('has title', async ({ page }) => {
   await page.goto('/')
 
-  // Expect a title "to contain" a substring.
+  // Home page redirects to login, but title should still be correct
   await expect(page).toHaveTitle(/Hawking Edison/)
 })
 
-test('shows main heading', async ({ page }) => {
+test('auth redirect flow', async ({ page }) => {
   await page.goto('/')
 
-  // Check main heading
-  await expect(page.getByRole('heading', { name: 'Hawking Edison' })).toBeVisible()
+  // Home page should redirect to login when not authenticated
+  await page.waitForURL('**/auth/login', { timeout: 10000 })
   
-  // Check subtitle - look for the paragraph containing the text
-  const subtitle = page.locator('p').filter({ hasText: 'LLM-Orchestrated Multi-Agent Intelligence' })
-  await expect(subtitle).toBeVisible()
+  // Verify we're on the login page
+  await expect(page.locator('text=Welcome back!')).toBeVisible()
 })
