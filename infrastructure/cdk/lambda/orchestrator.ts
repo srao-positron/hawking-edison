@@ -22,6 +22,9 @@ interface Session {
   execution_count: number
   created_at: string
   updated_at: string
+  started_at?: string
+  final_response?: string
+  error?: string
 }
 
 interface ToolCall {
@@ -94,9 +97,18 @@ async function saveSession(supabase: any, session: Session) {
 async function completeSession(supabase: any, session: Session, response: string) {
   await updateSession(supabase, session.id, {
     status: 'completed',
-    final_response: response,
     completed_at: new Date().toISOString()
-  })
+  } as any)
+  
+  // Update final_response separately since it's not in the Session interface
+  const { error } = await supabase
+    .from('orchestration_sessions')
+    .update({ final_response: response })
+    .eq('id', session.id)
+  
+  if (error) {
+    throw new Error(`Failed to update final response: ${error.message}`)
+  }
 }
 
 // Handle timeout by queueing resumption
@@ -126,11 +138,19 @@ async function handleTimeout(supabase: any, session: Session) {
 async function handleError(supabase: any, sessionId: string, error: any) {
   console.error(`Error in orchestration for session ${sessionId}:`, error)
   
-  await updateSession(supabase, sessionId, {
-    status: 'failed',
-    error: error.message || 'Unknown error',
-    error_count: 1 // This would need to be incremented from current value
-  })
+  const { error: updateError } = await supabase
+    .from('orchestration_sessions')
+    .update({
+      status: 'failed',
+      error: error.message || 'Unknown error',
+      error_count: 1, // This would need to be incremented from current value
+      updated_at: new Date().toISOString()
+    })
+    .eq('id', sessionId)
+  
+  if (updateError) {
+    console.error('Failed to update error status:', updateError)
+  }
 }
 
 // Placeholder for LLM calls with tools
@@ -179,9 +199,16 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
       // Update status to running
       await updateSession(supabase, session.id, { 
         status: 'running',
-        execution_count: session.execution_count + 1,
-        started_at: session.started_at || new Date().toISOString()
+        execution_count: session.execution_count + 1
       })
+      
+      // Update started_at if not already set
+      if (!session.started_at) {
+        await supabase
+          .from('orchestration_sessions')
+          .update({ started_at: new Date().toISOString() })
+          .eq('id', session.id)
+      }
       
       // Main orchestration loop
       while (true) {

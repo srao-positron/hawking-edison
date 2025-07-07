@@ -113,8 +113,8 @@ export class HawkingEdisonStack extends cdk.Stack {
       secretName: 'hawking-edison/edge-function-creds',
       description: 'AWS credentials for Supabase Edge Functions',
       secretObjectValue: {
-        accessKeyId: cdk.SecretValue.resourceAttribute(accessKey.ref),
-        secretAccessKey: cdk.SecretValue.resourceAttribute(accessKey.attrSecretAccessKey),
+        accessKeyId: cdk.SecretValue.unsafePlainText(accessKey.accessKeyId),
+        secretAccessKey: accessKey.secretAccessKey,
         region: cdk.SecretValue.unsafePlainText(this.region),
         topicArn: cdk.SecretValue.unsafePlainText(orchestrationTopic.topicArn),
       },
