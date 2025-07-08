@@ -13,14 +13,19 @@ test.describe('Minimal Production Tests', () => {
   
   test('can navigate to signup', async ({ page }) => {
     await page.goto('/auth/login')
+    await page.waitForLoadState('networkidle')
     
-    // Find the signup link - use a more flexible selector
-    const signupLink = page.locator('a').filter({ hasText: /sign up/i }).first()
+    // Look for the "Create account" link specifically
+    const signupLink = page.getByRole('link', { name: 'Create account' })
     await expect(signupLink).toBeVisible({ timeout: 10000 })
     
+    // Click the link
     await signupLink.click()
     
-    // Should be on signup page
-    await expect(page.url()).toContain('/auth/signup')
+    // Wait for URL to change
+    await page.waitForURL('**/auth/signup', { timeout: 30000 })
+    
+    // Verify we're on signup page
+    expect(page.url()).toContain('/auth/signup')
   })
 })
