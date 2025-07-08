@@ -35,8 +35,9 @@ test.describe('Authentication Flow', () => {
     // Wait for page to load
     await page.waitForLoadState('networkidle')
     
-    // Click signup link
-    await page.click('text="Don\'t have an account? Sign up"')
+    // Click signup link - use more specific selector
+    const signupLink = page.locator('a:has-text("Don\'t have an account? Sign up")').first()
+    await signupLink.click()
     
     // Should navigate to signup page
     await expect(page.locator('h1:has-text("Create your account")')).toBeVisible({ timeout: 10000 })
@@ -86,8 +87,8 @@ test.describe('Authentication Flow', () => {
     // Submit form
     await page.click('button[type="submit"]')
     
-    // Should show error message
-    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 10000 })
+    // Should show error message - use first() for strict mode
+    await expect(page.locator('[role="alert"]').first()).toBeVisible({ timeout: 10000 })
     
     // Should stay on login page
     const url = page.url()
@@ -115,8 +116,8 @@ test.describe('Authentication Flow', () => {
     await page.fill('input[type="password"]', UNVERIFIED_USER.password)
     await page.click('button[type="submit"]')
     
-    // Should show error about email confirmation
-    await expect(page.locator('[role="alert"]')).toBeVisible({ timeout: 10000 })
+    // Should show error about email confirmation - use first() for strict mode
+    await expect(page.locator('[role="alert"]').first()).toBeVisible({ timeout: 10000 })
   })
 
   test.skip('password reset flow', async ({ page }) => {
@@ -155,12 +156,14 @@ test.describe('Authentication Flow', () => {
     await page.goto('/auth/login')
     await page.waitForLoadState('networkidle')
     
-    // Navigate to signup
-    await page.click('text="Don\'t have an account? Sign up"')
+    // Navigate to signup - use more specific selector
+    const signupNav = page.locator('a:has-text("Don\'t have an account? Sign up")').first()
+    await signupNav.click()
     await expect(page.locator('h1:has-text("Create your account")')).toBeVisible({ timeout: 10000 })
     
-    // Navigate back to login
-    await page.click('text="Already have an account? Sign in"')
+    // Navigate back to login - use more specific selector
+    const loginNav = page.locator('a:has-text("Already have an account? Sign in")').first()
+    await loginNav.click()
     await expect(page.locator('h1:has-text("Welcome back!")')).toBeVisible({ timeout: 10000 })
   })
 

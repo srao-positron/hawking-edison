@@ -48,24 +48,56 @@ async function verifyTestUser() {
       process.exit(1)
     }
 
-    const testUser = existingUsers?.find(u => u.email === testEmail)
+    let testUser = existingUsers?.find(u => u.email === testEmail)
+    let authData: any = null
     
     if (!testUser) {
-      console.error('❌ Test user does not exist in production!')
-      console.error('   Expected email:', testEmail)
-      console.error('   Total users found:', existingUsers?.length || 0)
+      console.log('⚠️  Test user does not exist, creating...')
       
-      // List all user emails (redacted) for debugging
-      if (existingUsers && existingUsers.length > 0) {
-        console.error('   Existing users:')
-        existingUsers.forEach(u => {
-          const email = u.email || 'no-email'
-          const redacted = email.substring(0, 3) + '***' + email.substring(email.lastIndexOf('@'))
-          console.error(`     - ${redacted} (${u.id})`)
-        })
+      // Create new test user
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+        email: testEmail,
+        password: testPassword,
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          full_name: 'Automated Test User',
+          is_test_user: true
+        }
+      })
+
+      if (createError) {
+        console.error('❌ Failed to create test user:', createError)
+        process.exit(1)
       }
+
+      if (!newUser.user) {
+        console.error('❌ User creation succeeded but no user data returned')
+        process.exit(1)
+      }
+
+      testUser = newUser.user
+      console.log('✅ Test user created')
+      console.log('   User ID:', testUser.id)
+    } else {
+      console.log('✅ Test user exists')
+      console.log('   User ID:', testUser.id)
+      console.log('   Email confirmed:', testUser.email_confirmed_at ? 'Yes' : 'No')
+      console.log('   Created at:', testUser.created_at)
       
-      process.exit(1)
+      // Ensure email is confirmed
+      if (!testUser.email_confirmed_at) {
+        console.log('⚠️  Email not confirmed, updating...')
+        const { error: updateError } = await supabase.auth.admin.updateUserById(
+          testUser.id,
+          { email_confirm: true }
+        )
+        
+        if (updateError) {
+          console.error('❌ Failed to confirm email:', updateError)
+        } else {
+          console.log('✅ Email confirmed')
+        }
+      }
     }
 
     console.log('✅ Test user exists')
@@ -84,7 +116,42 @@ async function verifyTestUser() {
       console.error('❌ Authentication failed:', authError.message)
       console.error('   Error code:', authError.code)
       console.error('   Error status:', authError.status)
-      process.exit(1)
+      
+      // Try to reset password if auth fails
+      if (authError.message.includes('Invalid login credentials')) {
+        console.log('⚠️  Attempting to reset password...')
+        
+        // Update password
+        const { error: passwordError } = await supabase.auth.admin.updateUserById(
+          testUser!.id,
+          { password: testPassword }
+        )
+        
+        if (passwordError) {
+          console.error('❌ Failed to reset password:', passwordError)
+          process.exit(1)
+        }
+        
+        console.log('✅ Password reset, retrying authentication...')
+        
+        // Retry authentication
+        const { data: retryAuth, error: retryError } = await supabase.auth.signInWithPassword({
+          email: testEmail,
+          password: testPassword
+        })
+        
+        if (retryError) {
+          console.error('❌ Authentication still failing:', retryError)
+          process.exit(1)
+        }
+        
+        authData = retryAuth
+        console.log('✅ Authentication successful after password reset')
+      } else {
+        process.exit(1)
+      }
+    } else {
+      console.log('✅ Authentication successful')
     }
 
     if (!authData.user) {

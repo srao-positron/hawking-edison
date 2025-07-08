@@ -181,7 +181,10 @@ export async function capturePageState(page: Page, label: string) {
 export async function waitForNetworkSettled(page: Page, timeout: number = 5000) {
   // Track pending requests in browser context
   await page.evaluate(() => {
-    window.pendingRequests = 0
+    // Initialize if not already defined
+    if (typeof window.pendingRequests === 'undefined') {
+      window.pendingRequests = 0
+    }
     
     const originalFetch = window.fetch
     window.fetch = async (...args) => {
@@ -231,7 +234,7 @@ export async function waitForNetworkSettled(page: Page, timeout: number = 5000) 
     
     // Wait for pending requests to reach 0
     await page.waitForFunction(() => {
-      return window.pendingRequests === 0
+      return typeof (window as any).pendingRequests !== 'undefined' && (window as any).pendingRequests === 0
     }, { timeout: timeout / 2 })
     
     // Additional wait to ensure no new requests start
