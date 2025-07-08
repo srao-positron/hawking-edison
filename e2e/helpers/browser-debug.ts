@@ -86,7 +86,7 @@ export async function waitForReactReady(page: Page, timeout: number = 10000) {
     const hasInteractiveElements = document.querySelectorAll('button, input, a').length > 0
     
     // Check if body has content
-    const hasContent = document.body.textContent?.trim().length > 0
+    const hasContent = (document.body.textContent?.trim()?.length || 0) > 0
     
     return hasReact && hasInteractiveElements && hasContent
   }, { timeout })

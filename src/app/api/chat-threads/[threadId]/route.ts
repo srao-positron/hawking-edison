@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { threadId: string } }
+  { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
     const cookieStore = await cookies()
@@ -19,11 +19,14 @@ export async function GET(
       )
     }
 
+    // Await params in Next.js 15
+    const { threadId } = await params
+
     // Call Edge Function
     const { data, error } = await supabase.functions.invoke('chat-threads', {
       body: {
         method: 'GET',
-        threadId: params.threadId
+        threadId: threadId
       }
     })
 
@@ -47,7 +50,7 @@ export async function GET(
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { threadId: string } }
+  { params }: { params: Promise<{ threadId: string }> }
 ) {
   try {
     const cookieStore = await cookies()
@@ -62,11 +65,14 @@ export async function DELETE(
       )
     }
 
+    // Await params in Next.js 15
+    const { threadId } = await params
+
     // Call Edge Function
     const { data, error } = await supabase.functions.invoke('chat-threads', {
       body: {
         method: 'DELETE',
-        threadId: params.threadId
+        threadId: threadId
       }
     })
 
