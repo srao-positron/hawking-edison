@@ -4,9 +4,10 @@ test.describe('Basic Production Tests', () => {
   test('can load login page', async ({ page }) => {
     await page.goto('/auth/login')
     
-    // Very simple check - just make sure we get a 200 response
+    // Very simple check - just make sure we get a successful response (200 or 304)
     const response = await page.goto('/auth/login')
-    expect(response?.status()).toBe(200)
+    const status = response?.status() || 0
+    expect([200, 304].includes(status)).toBeTruthy()
     
     // Check for any heading
     const heading = await page.locator('h1, h2, h3').first()

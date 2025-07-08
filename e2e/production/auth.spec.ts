@@ -87,8 +87,9 @@ test.describe('Authentication Flow', () => {
     // Submit form
     await page.click('button[type="submit"]')
     
-    // Should show error message - use first() for strict mode
-    await expect(page.locator('[role="alert"]').first()).toBeVisible({ timeout: 10000 })
+    // Should show error message - exclude Next.js route announcer
+    const errorAlert = page.locator('[role="alert"]').filter({ hasNot: page.locator('#__next-route-announcer__') })
+    await expect(errorAlert.first()).toBeVisible({ timeout: 10000 })
     
     // Should stay on login page
     const url = page.url()
@@ -116,8 +117,9 @@ test.describe('Authentication Flow', () => {
     await page.fill('input[type="password"]', UNVERIFIED_USER.password)
     await page.click('button[type="submit"]')
     
-    // Should show error about email confirmation - use first() for strict mode
-    await expect(page.locator('[role="alert"]').first()).toBeVisible({ timeout: 10000 })
+    // Should show error about email confirmation - exclude Next.js route announcer
+    const confirmAlert = page.locator('[role="alert"]').filter({ hasNot: page.locator('#__next-route-announcer__') })
+    await expect(confirmAlert.first()).toBeVisible({ timeout: 10000 })
   })
 
   test.skip('password reset flow', async ({ page }) => {

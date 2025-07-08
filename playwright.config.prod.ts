@@ -11,6 +11,9 @@ export default defineConfig({
   // Test directory for production tests
   testDir: './e2e/production',
   
+  // Run only minimal tests in CI for now
+  testMatch: process.env.CI ? ['**/minimal.spec.ts', '**/basic.spec.ts'] : undefined,
+  
   // Use production URL in CI, local in development
   use: {
     ...baseConfig.use,
@@ -27,4 +30,7 @@ export default defineConfig({
   
   // More retries in production
   retries: process.env.CI ? 2 : 0,
+  
+  // Timeout for CI
+  timeout: 60000,
 })

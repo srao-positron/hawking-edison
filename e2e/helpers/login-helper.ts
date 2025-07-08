@@ -109,8 +109,9 @@ export async function loginUser(page: Page, email: string, password: string) {
     await page.waitForLoadState('networkidle', { timeout: 10000 })
   } catch (navigationError) {
     // Check if there's an error alert instead
-    const errorAlert = page.locator('[role="alert"]')
-    if (await errorAlert.isVisible()) {
+    // Exclude the Next.js route announcer which also has role="alert"
+    const errorAlert = page.locator('[role="alert"]').filter({ hasNot: page.locator('#__next-route-announcer__') })
+    if (await errorAlert.first().isVisible()) {
       // Login failed with error - this is expected for invalid credentials
       return
     }

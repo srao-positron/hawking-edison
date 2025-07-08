@@ -39,15 +39,18 @@ test.describe('Production Smoke Tests', () => {
     await submitButton.click()
     
     // Wait for either success or error
+    const errorAlert = page.locator('[role="alert"]').filter({ hasNot: page.locator('#__next-route-announcer__') })
+    
     const result = await Promise.race([
       page.waitForURL('**/chat', { timeout: 30000 }).then(() => 'success'),
-      page.locator('[role="alert"]').first().waitFor({ state: 'visible', timeout: 5000 }).then(() => 'error')
+      errorAlert.first().waitFor({ state: 'visible', timeout: 5000 }).then(() => 'error')
     ]).catch(() => 'timeout')
     
     if (result === 'error') {
-      const errorText = await page.locator('[role="alert"]').first().textContent()
+      const errorText = await errorAlert.first().textContent()
       console.error('Login failed with error:', errorText)
       console.error('Test user email:', TEST_USER.email)
+      console.error('Note: Make sure TEST_USER_EMAIL and TEST_USER_PASSWORD are set correctly in GitHub secrets')
     }
     
     expect(result).toBe('success')
