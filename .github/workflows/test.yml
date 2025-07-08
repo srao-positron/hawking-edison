@@ -97,9 +97,12 @@ jobs:
         if: failure()
         run: |
           echo "Tests failed! Gathering debug information..."
-          npx tsx utils/debug-playwright.ts
+          echo "Checking CI authentication setup..."
+          npx tsx utils/debug-ci-auth.ts || true
           echo "Testing auth flow manually..."
           npx tsx utils/test-auth-flow.ts || true
+          echo "Playwright debug info..."
+          npx tsx utils/debug-playwright.ts || true
 
       - name: Upload Playwright Report
         uses: actions/upload-artifact@v4
