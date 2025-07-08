@@ -406,3 +406,252 @@ npm run test:e2e:ui
 4. CI runs `npm run test:e2e:prod` against deployed app
 
 **Never mix local and production tests!**
+
+---
+
+## Rule 17: Route Groups - Never Duplicate Pages
+
+**ALWAYS check for existing routes before creating new pages:**
+
+```bash
+# Before creating ANY new page:
+1. Run: Glob "**/**/page.tsx" to see all existing pages
+2. Check if the route already exists in ANY route group
+3. Never create duplicate pages in different route groups
+
+# Example structure:
+/app
+  /(with-nav)      # Pages WITH navigation
+    /settings      # ✅ Settings here
+    /dashboard     # ✅ Dashboard here
+  /(auth)          # Pages WITHOUT navigation  
+    /login         # ✅ Auth pages here
+    /signup        # ✅ Auth pages here
+  /api             # API routes only
+
+# ❌ NEVER:
+/app/settings AND /app/(with-nav)/settings
+/app/login AND /app/(auth)/login
+```
+
+**If you need to reorganize routes:**
+1. Move the page.tsx file
+2. Delete the old directory
+3. Update ALL links and tests
+4. Run tests to verify
+
+---
+
+## Rule 18: Cookie Handling in API Routes
+
+**ALWAYS await cookies() in Next.js API routes:**
+
+```typescript
+// ❌ WRONG - Will cause runtime errors
+import { cookies } from 'next/headers'
+export async function GET() {
+  const cookieStore = cookies()  // Missing await!
+  const supabase = createClient(cookieStore)
+}
+
+// ✅ CORRECT
+import { cookies } from 'next/headers'
+export async function GET() {
+  const cookieStore = await cookies()
+  const supabase = createClient(cookieStore)
+}
+```
+
+**This applies to ALL Next.js server functions:**
+- `cookies()` - Must await
+- `headers()` - Must await  
+- Built-in async functions that access request context
+
+---
+
+## Rule 19: Browser-Specific Test Handling
+
+**ALWAYS handle browser differences in E2E tests:**
+
+```typescript
+// ✅ Add browser-specific handling
+test('login flow', async ({ page, browserName }) => {
+  // WebKit sometimes needs extra time for buttons
+  if (browserName === 'webkit') {
+    await page.waitForTimeout(500)
+    await submitButton.click({ force: true })
+  }
+  
+  // Firefox/WebKit need extra time after actions
+  if (browserName === 'firefox' || browserName === 'webkit') {
+    await page.waitForTimeout(1000)
+  }
+})
+
+// ❌ NEVER use deprecated patterns:
+await Promise.all([
+  page.click('button'),
+  page.waitForNavigation()
+])
+
+// ✅ ALWAYS use modern patterns:
+await page.click('button')
+await page.waitForURL('**/expected-path')
+```
+
+**Browser-specific issues to watch for:**
+- WebKit: Form submissions may need force click
+- Firefox/WebKit: Auth redirects need delays
+- All browsers: Navigation can be interrupted
+- Mobile viewports: Different UI behavior
+
+---
+
+## Rule 20: Flexible Test Selectors
+
+**ALWAYS use flexible selectors that survive UI changes:**
+
+```typescript
+// ❌ WRONG - Too brittle
+await expect(page.locator('h1')).toContainText('Settings')
+await page.click('button.primary-btn')
+
+// ✅ CORRECT - Survives UI updates
+await expect(
+  page.getByRole('heading', { name: 'Settings' })
+).toBeVisible()
+
+// ✅ BETTER - Multiple fallbacks
+await expect(
+  page.locator('h1, h2').filter({ hasText: 'Settings' })
+).toBeVisible()
+
+// ✅ Robust form selectors
+await page.locator('input[type="email"], input[placeholder*="email" i]').fill(email)
+await page.locator('button[type="submit"], button:has-text("Sign in")').click()
+```
+
+**Selector priority:**
+1. Semantic roles (heading, button, link)
+2. Accessible labels (aria-label, name)
+3. Test IDs (data-testid) for complex cases
+4. Multiple fallback selectors
+5. Text content as last resort
+
+---
+
+## Rule 21: Test Maintenance Checklist
+
+**ALWAYS follow this checklist when changing UI:**
+
+```bash
+# UI Change Checklist:
+1. Search for element in tests: 
+   Grep "old-text" "e2e/**/*.spec.ts"
+   
+2. Update ALL occurrences
+
+3. Check for:
+   - Heading levels (h1 vs h2 vs h3)
+   - Button text changes
+   - Link hrefs and navigation
+   - Form labels and placeholders
+   - Error message text
+   - Page titles
+   - CSS classes used in tests
+   
+# Common pitfall areas:
+- Navigation components (sidebar, header)
+- Form submissions
+- Error states
+- Loading indicators (.animate-bounce, etc)
+- Mobile vs desktop views
+
+# After changes:
+npm run test:e2e:local -- --project=chromium  # Fast check
+npm run test:e2e:local                        # Full cross-browser
+```
+
+---
+
+## Rule 22: Project Structure Validation
+
+**ALWAYS verify project structure consistency:**
+
+```bash
+# Before adding new directories/files:
+1. Check for route groups: ls -la src/app/
+2. Verify no duplicates: Glob "**/[feature]/**"
+3. Maintain consistency:
+   - Auth pages → /(auth) route group
+   - App pages → /(with-nav) route group
+   - API routes → /api only
+   - Shared components → /components
+   - Edge Functions → supabase/functions
+
+# Common mistakes to avoid:
+- Creating pages outside route groups
+- Mixing API routes with pages
+- Duplicate implementations
+- Inconsistent file naming
+```
+
+---
+
+## Rule 23: Login Helpers Must Be Robust
+
+**ALWAYS use the robust login helper pattern in tests:**
+
+```typescript
+// ✅ CORRECT - Handles all browsers
+async function loginAsTestUser(page: Page) {
+  // Navigate with retry logic
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      await page.goto('/auth/login', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      break;
+    } catch (error) {
+      retries--;
+      if (retries === 0) throw error;
+      await page.waitForTimeout(1000);
+    }
+  }
+  
+  // Wait for any redirects to settle
+  await page.waitForLoadState('networkidle');
+  
+  // Flexible heading detection
+  const headingLocator = page.locator('h1, h2').filter({ hasText: /Welcome back/i });
+  
+  try {
+    await expect(headingLocator.first()).toBeVisible({ timeout: 20000 });
+  } catch (error) {
+    // Check if already logged in
+    if (page.url().includes('/chat')) {
+      return;
+    }
+    throw error;
+  }
+  
+  // Robust form filling
+  await page.locator('input[type="email"], input[placeholder*="email" i]').fill(TEST_USER.email);
+  await page.locator('input[type="password"]').fill(TEST_USER.password);
+  
+  // Browser-specific submit
+  const submitButton = page.locator('button[type="submit"], button:has-text("Sign in")');
+  const browserName = page.context().browser()?.browserType().name();
+  if (browserName === 'webkit') {
+    await page.waitForTimeout(500);
+    await submitButton.click({ force: true });
+  } else {
+    await submitButton.click();
+  }
+  
+  // Modern navigation wait
+  await page.waitForURL('**/chat', { timeout: 20000 });
+  await page.waitForLoadState('networkidle');
+}
+```
+
+**Never use simplified login that breaks in some browsers!**

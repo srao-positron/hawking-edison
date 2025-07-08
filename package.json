@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run supabase:start && next dev",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -30,7 +30,10 @@
     "test:llm": "tsx utils/test-llm-keys.ts",
     "test:lambda": "cd infrastructure/cdk/lambda && tsx ../../../utils/test-lambda-local.ts",
     "test:lambda:all": "cd infrastructure/cdk/lambda && tsx ../../../utils/test-lambda-local.ts all",
-    "test:api-keys": "tsx utils/test-api-keys.ts"
+    "test:api-keys": "tsx utils/test-api-keys.ts",
+    "test:browser-auth": "tsx utils/test-browser-auth.ts",
+    "test:auth:debug": "npx playwright test e2e/cross-browser/auth-cross-browser.spec.ts --debug",
+    "validate": "tsx utils/validate-structure.ts"
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.840.0",

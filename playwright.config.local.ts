@@ -17,9 +17,9 @@ export default defineConfig({
     baseURL: 'http://localhost:3000',
   },
 
-  // Local dev server
+  // Local dev server (without local Supabase)
   webServer: {
-    command: 'npm run dev',
+    command: 'next dev',
     url: 'http://localhost:3000',
     reuseExistingServer: true,
     timeout: 120 * 1000,

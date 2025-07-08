@@ -306,6 +306,65 @@ npm test
 4. Push when tests pass
 5. After deployment, move tests to `e2e/production/`
 
+### Cross-Browser Testing Lessons
+
+**Critical patterns learned from test failures:**
+
+1. **Route Groups - Check for duplicates FIRST**
+   ```bash
+   # Before creating ANY page, always run:
+   Glob "**/**/page.tsx"  # See ALL existing pages
+   # Never create duplicate routes like:
+   # /app/settings AND /app/(with-nav)/settings
+   ```
+
+2. **API Routes - Always await cookies()**
+   ```typescript
+   // ❌ WRONG - Causes "Cannot read properties of undefined"
+   const supabase = createClient()
+   
+   // ✅ CORRECT
+   const cookieStore = await cookies()
+   const supabase = createClient(cookieStore)
+   ```
+
+3. **Browser-Specific Test Handling**
+   ```typescript
+   // WebKit needs special handling for form submissions
+   test('login', async ({ page, browserName }) => {
+     if (browserName === 'webkit') {
+       await page.waitForTimeout(500)
+       await submitButton.click({ force: true })
+     }
+   })
+   ```
+
+4. **Flexible Test Selectors - Don't assume h1**
+   ```typescript
+   // ❌ WRONG - Breaks when UI changes from h1 to h2
+   await expect(page.locator('h1')).toContainText('Settings')
+   
+   // ✅ CORRECT - Survives heading level changes
+   await expect(
+     page.locator('h1, h2').filter({ hasText: 'Settings' })
+   ).toBeVisible()
+   ```
+
+5. **Modern Navigation - No Promise.all**
+   ```typescript
+   // ❌ DEPRECATED - Fails in WebKit
+   await Promise.all([
+     page.click('button'),
+     page.waitForNavigation()
+   ])
+   
+   // ✅ MODERN - Works everywhere
+   await page.click('button')
+   await page.waitForURL('**/expected-path')
+   ```
+
+**Remember**: When changing UI, ALWAYS update tests! Use `Grep "old-text" "e2e/**/*.spec.ts"` to find all occurrences.
+
 ### Three Killer Demos
 1. **Business Decision**: "Should OpenAI buy Anthropic?"
 2. **Code Review**: "Review this PR: [URL]"

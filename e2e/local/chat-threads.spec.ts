@@ -6,16 +6,57 @@ const TEST_USER = getTestUser()
 
 // Helper to login test user
 async function loginAsTestUser(page: Page) {
-  await page.goto('/auth/login')
-  await expect(page.locator('h1:has-text("Welcome back!")')).toBeVisible({ timeout: 10000 })
+  // Navigate with retry logic
+  let retries = 3;
+  while (retries > 0) {
+    try {
+      await page.goto('/auth/login', { waitUntil: 'domcontentloaded', timeout: 30000 });
+      break;
+    } catch (error) {
+      retries--;
+      if (retries === 0) throw error;
+      await page.waitForTimeout(1000);
+    }
+  }
   
-  await page.fill('input[placeholder="your@email.com"]', TEST_USER.email)
-  await page.fill('input[type="password"]', TEST_USER.password)
+  // Wait for any redirects to settle
+  await page.waitForLoadState('networkidle');
   
-  await Promise.all([
-    page.waitForNavigation({ url: '**/chat', waitUntil: 'networkidle' }),
-    page.click('button[type="submit"]')
-  ])
+  // More flexible heading detection
+  const headingLocator = page.locator('h1, h2').filter({ hasText: /Welcome back/i });
+  
+  try {
+    await expect(headingLocator.first()).toBeVisible({ timeout: 20000 });
+  } catch (error) {
+    // Fallback: check if we're already on chat page (already logged in)
+    if (page.url().includes('/chat')) {
+      return; // Already logged in
+    }
+    
+    // Log current URL and page content for debugging
+    console.error('Login page failed to load. Current URL:', page.url());
+    throw error;
+  }
+  
+  // Use more robust selectors for form fields
+  await page.locator('input[type="email"], input[placeholder*="email" i]').fill(TEST_USER.email);
+  await page.locator('input[type="password"]').fill(TEST_USER.password);
+  
+  // Click submit with retry
+  const submitButton = page.locator('button[type="submit"], button:has-text("Sign in")');
+  
+  // WebKit sometimes needs extra time for button to be clickable
+  const browserName = page.context().browser()?.browserType().name();
+  if (browserName === 'webkit') {
+    await page.waitForTimeout(500);
+    await submitButton.click({ force: true });
+  } else {
+    await submitButton.click();
+  }
+  
+  // Wait for navigation to chat page
+  await page.waitForURL('**/chat', { timeout: 20000 });
+  await page.waitForLoadState('networkidle');
 }
 
 test.describe('Chat Threads', () => {
