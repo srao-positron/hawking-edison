@@ -203,12 +203,12 @@ export async function waitForNetworkSettled(page: Page, timeout: number = 5000) 
     const originalOpen = XMLHttpRequest.prototype.open
     const originalSend = XMLHttpRequest.prototype.send
     
-    XMLHttpRequest.prototype.open = function(...args) {
+    XMLHttpRequest.prototype.open = function(this: XMLHttpRequest, method: string, url: string | URL, async?: boolean, username?: string | null, password?: string | null) {
       this._pendingRequest = true
-      return originalOpen.apply(this, args)
+      return originalOpen.call(this, method, url, async !== undefined ? async : true, username, password)
     }
     
-    XMLHttpRequest.prototype.send = function(...args) {
+    XMLHttpRequest.prototype.send = function(this: XMLHttpRequest, body?: Document | XMLHttpRequestBodyInit | null) {
       if (this._pendingRequest) {
         window.pendingRequests++
         
@@ -224,7 +224,7 @@ export async function waitForNetworkSettled(page: Page, timeout: number = 5000) 
           window.pendingRequests--
         })
       }
-      return originalSend.apply(this, args)
+      return originalSend.call(this, body)
     }
   })
   

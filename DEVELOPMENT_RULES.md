@@ -655,3 +655,49 @@ async function loginAsTestUser(page: Page) {
 ```
 
 **Never use simplified login that breaks in some browsers!**
+
+---
+
+## Rule 24: Work Isn't Done Until CI Passes
+
+**MANDATORY**: A feature or fix is NOT complete until:
+
+```bash
+# Local verification (BEFORE pushing):
+1. npm run build          # Must pass
+2. npm run test          # Must pass
+3. npm run test:e2e      # Must pass
+4. npm run lint          # Must pass
+5. npm run typecheck     # Must pass
+
+# After pushing:
+6. Monitor GitHub Actions workflows
+7. ALL workflows must be GREEN:
+   - Deploy Frontend (Vercel deployment)
+   - Deploy Lambda (AWS deployment)
+   - Run Tests (Playwright tests)
+8. Verify deployment succeeded in production
+```
+
+**DO NOT:**
+- Claim a task is complete without CI passing
+- Move to next feature with failing CI
+- Disable tests to make them pass
+- Ignore build warnings
+- Push "hoping it will work" in CI
+
+**ALWAYS:**
+- Run full local verification before pushing
+- Watch GitHub Actions after pushing
+- Fix CI failures IMMEDIATELY
+- Test the deployed feature in production
+
+**If CI fails:**
+1. Check the specific failure
+2. Fix locally
+3. Verify fix with local tests
+4. Push fix
+5. Monitor CI again
+6. Repeat until GREEN
+
+**Remember: "It works on my machine" doesn't count!**
