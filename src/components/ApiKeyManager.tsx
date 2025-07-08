@@ -38,9 +38,23 @@ export default function ApiKeyManager() {
       setLoading(true)
       const data = await api.apiKeys.list()
       setKeys(data.keys)
-    } catch (err) {
-      setError('Failed to load API keys')
-      console.error('Error loading keys:', err)
+    } catch (err: any) {
+      console.error('Error loading API keys:', err)
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        response: err.response,
+        status: err.status
+      })
+      
+      // Set a more descriptive error message
+      if (err.message?.includes('Not authenticated')) {
+        setError('Authentication required. Please log in to manage API keys.')
+      } else if (err.message?.includes('Network')) {
+        setError('Network error. Please check your connection and try again.')
+      } else {
+        setError(`Failed to load API keys: ${err.message || 'Unknown error'}`)
+      }
     } finally {
       setLoading(false)
     }

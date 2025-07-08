@@ -76,19 +76,19 @@ class ApiClient {
       clearTimeout(timeoutId)
 
       if (!response.ok) {
-        const error = await response.json().catch(() => ({ error: 'Unknown error' }))
+        const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
         
         // Don't retry auth errors
         if (response.status === 401 || response.status === 403) {
-          throw new Error(error.error?.message || 'Authentication failed')
+          throw new Error(errorData.error?.message || 'Authentication failed')
         }
 
         // Retry on 5xx errors or rate limit
         if (response.status >= 500 || response.status === 429) {
-          throw new Error(error.error?.message || `HTTP ${response.status}`)
+          throw new Error(errorData.error?.message || `HTTP ${response.status}`)
         }
 
-        throw new Error(error.error?.message || `Request failed: ${response.status}`)
+        throw new Error(errorData.error?.message || `Request failed: ${response.status}`)
       }
 
       return await response.json()
