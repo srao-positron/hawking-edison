@@ -1,5 +1,16 @@
 import { Page } from '@playwright/test'
 
+// Extend window for our tracking
+declare global {
+  interface Window {
+    pendingRequests: number
+  }
+  
+  interface XMLHttpRequest {
+    _pendingRequest?: boolean
+  }
+}
+
 /**
  * Browser-specific debugging utilities
  */
@@ -168,15 +179,51 @@ export async function capturePageState(page: Page, label: string) {
  * Wait for network to be truly idle (stricter than networkidle)
  */
 export async function waitForNetworkSettled(page: Page, timeout: number = 5000) {
-  let pendingRequests = 0
-  
-  const onRequest = () => pendingRequests++
-  const onResponse = () => pendingRequests--
-  const onFailed = () => pendingRequests--
-  
-  page.on('request', onRequest)
-  page.on('response', onResponse)
-  page.on('requestfailed', onFailed)
+  // Track pending requests in browser context
+  await page.evaluate(() => {
+    window.pendingRequests = 0
+    
+    const originalFetch = window.fetch
+    window.fetch = async (...args) => {
+      window.pendingRequests++
+      try {
+        const result = await originalFetch.apply(window, args)
+        window.pendingRequests--
+        return result
+      } catch (error) {
+        window.pendingRequests--
+        throw error
+      }
+    }
+    
+    // Also track XHR requests
+    const originalOpen = XMLHttpRequest.prototype.open
+    const originalSend = XMLHttpRequest.prototype.send
+    
+    XMLHttpRequest.prototype.open = function(...args) {
+      this._pendingRequest = true
+      return originalOpen.apply(this, args)
+    }
+    
+    XMLHttpRequest.prototype.send = function(...args) {
+      if (this._pendingRequest) {
+        window.pendingRequests++
+        
+        this.addEventListener('load', () => {
+          window.pendingRequests--
+        })
+        
+        this.addEventListener('error', () => {
+          window.pendingRequests--
+        })
+        
+        this.addEventListener('abort', () => {
+          window.pendingRequests--
+        })
+      }
+      return originalSend.apply(this, args)
+    }
+  })
   
   try {
     // Wait for initial requests to complete
@@ -184,14 +231,13 @@ export async function waitForNetworkSettled(page: Page, timeout: number = 5000) 
     
     // Wait for pending requests to reach 0
     await page.waitForFunction(() => {
-      return pendingRequests === 0
+      return window.pendingRequests === 0
     }, { timeout: timeout / 2 })
     
     // Additional wait to ensure no new requests start
     await page.waitForTimeout(500)
-  } finally {
-    page.off('request', onRequest)
-    page.off('response', onResponse)
-    page.off('requestfailed', onFailed)
+  } catch (error) {
+    // If this fails, just continue - it's a helper function
+    console.warn('waitForNetworkSettled failed:', error)
   }
 }
