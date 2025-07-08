@@ -107,7 +107,7 @@ async function verifyTestUser() {
 
     // Step 2: Test authentication
     console.log('\n2️⃣ Testing authentication...')
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+    const { data, error: authError } = await supabase.auth.signInWithPassword({
       email: testEmail,
       password: testPassword
     })
@@ -151,15 +151,14 @@ async function verifyTestUser() {
         process.exit(1)
       }
     } else {
+      authData = data
       console.log('✅ Authentication successful')
     }
 
-    if (!authData.user) {
+    if (!authData || !authData.user) {
       console.error('❌ Authentication succeeded but no user data returned')
       process.exit(1)
     }
-
-    console.log('✅ Authentication successful')
     console.log('   Session created:', !!authData.session)
     console.log('   Access token:', authData.session?.access_token ? 'Present' : 'Missing')
 
