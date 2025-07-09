@@ -11,19 +11,42 @@ export interface AuthUser {
   apiKeyName?: string
 }
 
-async function authenticateWithSession(cookieStore: any): Promise<AuthUser | null> {
+async function authenticateWithSession(request: NextRequest, cookieStore: any): Promise<AuthUser | null> {
   const supabase = createClient(cookieStore)
+  
+  // First try to get user from cookies (standard session)
   const { data: { user }, error } = await supabase.auth.getUser()
   
-  if (error || !user) {
-    return null
+  if (!error && user) {
+    return {
+      id: user.id,
+      email: user.email,
+      authMethod: 'session'
+    }
   }
   
-  return {
-    id: user.id,
-    email: user.email,
-    authMethod: 'session'
+  // If no cookie session, check for Bearer token with Supabase JWT
+  const authHeader = request.headers.get('authorization')
+  if (authHeader?.startsWith('Bearer ') && !authHeader.includes('hke_')) {
+    const token = authHeader.substring(7)
+    
+    try {
+      // Verify the JWT token
+      const { data: { user: tokenUser }, error: tokenError } = await supabase.auth.getUser(token)
+      
+      if (!tokenError && tokenUser) {
+        return {
+          id: tokenUser.id,
+          email: tokenUser.email,
+          authMethod: 'session'
+        }
+      }
+    } catch (e) {
+      // Invalid token
+    }
   }
+  
+  return null
 }
 
 async function authenticateWithApiKey(apiKey: string): Promise<AuthUser | null> {
@@ -96,7 +119,7 @@ export async function authenticate(request: NextRequest): Promise<AuthUser | nul
   }
   
   const cookieStore = await cookies()
-  return authenticateWithSession(cookieStore)
+  return authenticateWithSession(request, cookieStore)
 }
 
 export async function requireAuth(request: NextRequest): Promise<AuthUser> {
