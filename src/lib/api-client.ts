@@ -1,5 +1,5 @@
 // API Client - Centralized API communication with auth, retries, and rate limiting
-import { supabase } from './supabase'
+import { createClient } from './supabase-browser'
 
 export interface ApiClientConfig {
   maxRetries?: number
@@ -27,6 +27,7 @@ class ApiClient {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
+    const supabase = createClient()
     const { data: { session } } = await supabase.auth.getSession()
     
     if (!session?.access_token) {
