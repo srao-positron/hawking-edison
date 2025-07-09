@@ -13,8 +13,8 @@ const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const LOCAL_API_URL = 'http://localhost:3001'
 
 // Test user credentials - update these with your test user
-const TEST_EMAIL = 'test@example.com'
-const TEST_PASSWORD = 'testpassword123'
+const TEST_EMAIL = 'test@hawkingedison.com'
+const TEST_PASSWORD = 'test123456'
 
 async function testApiKeysEndpoint() {
   console.log('🔍 Testing API Keys Endpoint with Authentication\n')

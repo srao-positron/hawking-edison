@@ -21,14 +21,8 @@ export async function updateSession(request: NextRequest) {
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) => {
-            // Set domain to .hawkingedison.com to share cookies with subdomains
-            const cookieOptions = {
-              ...options,
-              domain: process.env.NODE_ENV === 'production' ? '.hawkingedison.com' : undefined,
-              secure: process.env.NODE_ENV === 'production',
-              sameSite: 'lax' as const
-            }
-            supabaseResponse.cookies.set(name, value, cookieOptions)
+            // Use default cookie options for now - Supabase handles domain correctly
+            supabaseResponse.cookies.set(name, value, options)
           })
         },
       },

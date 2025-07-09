@@ -15,14 +15,7 @@ export function createClient(cookieStore: ReadonlyRequestCookies) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              // Set domain to .hawkingedison.com to share cookies with subdomains
-              const cookieOptions = {
-                ...options,
-                domain: process.env.NODE_ENV === 'production' ? '.hawkingedison.com' : undefined,
-                secure: process.env.NODE_ENV === 'production',
-                sameSite: 'lax' as const
-              }
-              cookieStore.set(name, value, cookieOptions)
+              cookieStore.set(name, value, options)
             })
           } catch {
             // The `setAll` method was called from a Server Component.

@@ -1,91 +1,108 @@
-#!/usr/bin/env tsx
-// Browser-based test for API keys endpoint
-// This script simulates browser requests with proper cookie handling
+#\!/usr/bin/env npx tsx
+// Test API keys with browser-like authentication flow
+import { chromium } from "playwright"
 
-import fetch from 'node-fetch'
-import dotenv from 'dotenv'
-import { resolve } from 'path'
-
-// Load environment variables
-dotenv.config({ path: resolve(__dirname, '../.env.local') })
-
-const LOCAL_API_URL = 'http://localhost:3001'
-
-async function testApiKeysWithBrowserAuth() {
-  console.log('🔍 Testing API Keys Endpoint with Browser Authentication\n')
-
-  console.log('This test requires you to:')
-  console.log('1. Open http://localhost:3001 in your browser')
-  console.log('2. Log in with your credentials')
-  console.log('3. Open DevTools (F12)')
-  console.log('4. Go to Network tab')
-  console.log('5. Find any request to localhost:3001')
-  console.log('6. Copy the Cookie header value')
-  console.log('7. Paste it below when prompted\n')
-
-  // For now, let's test without authentication to see what happens
-  console.log('Testing without authentication first...\n')
-
+async function testBrowserAuth() {
+  const browser = await chromium.launch({ headless: true })
+  const context = await browser.newContext()
+  const page = await context.newPage()
+  
   try {
-    // Test 1: No authentication
-    console.log('Test 1: GET /api/api-keys (no auth)')
-    const response1 = await fetch(`${LOCAL_API_URL}/api/api-keys`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
+    console.log("Testing API Keys with Browser Authentication")
+    console.log("===========================================\n")
+    
+    // Navigate to login page
+    console.log("1. Navigating to login page...")
+    await page.goto("http://localhost:3001/auth/login")
+    await page.waitForLoadState("networkidle")
+    
+    // Fill in login form
+    console.log("2. Filling login form...")
+    await page.fill("input[placeholder=\"your@email.com\"]", "test@hawkingedison.com")
+    await page.fill("input[type=\"password\"]", "test123456")
+    
+    // Submit form
+    console.log("3. Submitting login...")
+    await page.click("button[type=\"submit\"]")
+    
+    // Wait for navigation or error
+    try {
+      await page.waitForURL("**/chat", { timeout: 10000 })
+      console.log("✓ Successfully logged in and redirected to chat")
+    } catch (e) {
+      // Check for error
+      const errorAlert = await page.locator("[role=\"alert\"]").textContent()
+      if (errorAlert) {
+        console.error("✗ Login failed:", errorAlert)
+        
+        // Try to create user
+        console.log("\n4. Attempting to create user...")
+        await page.goto("http://localhost:3001/auth/signup")
+        await page.waitForLoadState("networkidle")
+        
+        await page.fill("input[placeholder=\"your@email.com\"]", "test@hawkingedison.com")
+        await page.fill("input[type=\"password\"]", "test123456")
+        await page.click("button[type=\"submit\"]")
+        
+        // Wait for result
+        await page.waitForTimeout(2000)
+        
+        // Try login again
+        console.log("5. Retrying login...")
+        await page.goto("http://localhost:3001/auth/login")
+        await page.fill("input[placeholder=\"your@email.com\"]", "test@hawkingedison.com")
+        await page.fill("input[type=\"password\"]", "test123456")
+        await page.click("button[type=\"submit\"]")
+        await page.waitForTimeout(2000)
       }
+    }
+    
+    // Get cookies
+    console.log("\n6. Checking cookies...")
+    const cookies = await context.cookies()
+    const authCookies = cookies.filter(c => c.name.includes("auth-token"))
+    console.log(`Found ${authCookies.length} auth cookies`)
+    authCookies.forEach(c => {
+      console.log(`  ${c.name}: ${c.value.substring(0, 50)}...`)
     })
-
-    console.log(`Status: ${response1.status} ${response1.statusText}`)
-    const data1 = await response1.json()
-    console.log('Response:', JSON.stringify(data1, null, 2))
-
-    // Test 2: Check if cookies are being read properly
-    console.log('\nTest 2: Debugging cookie handling')
     
-    // Create a debug endpoint to check cookie parsing
-    console.log('\nTo manually test with your browser cookies:')
-    console.log('1. Get your cookies from browser DevTools')
-    console.log('2. Run this curl command:\n')
+    // Test API endpoint
+    console.log("\n7. Testing /api/api-keys endpoint...")
+    const apiResponse = await page.evaluate(async () => {
+      const response = await fetch("/api/api-keys", {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+      const data = await response.json()
+      return { status: response.status, data }
+    })
     
-    console.log(`curl -X GET ${LOCAL_API_URL}/api/api-keys \\`)
-    console.log(`  -H "Content-Type: application/json" \\`)
-    console.log(`  -H "Cookie: YOUR_COOKIE_STRING_HERE"`)
+    console.log(`API Response Status: ${apiResponse.status}`)
+    console.log("API Response:", JSON.stringify(apiResponse.data, null, 2))
+    
+    // Test direct auth check
+    console.log("\n8. Testing /api/test-auth endpoint...")
+    const authResponse = await page.evaluate(async () => {
+      const response = await fetch("/api/test-auth", {
+        method: "GET",
+        credentials: "include"
+      })
+      const data = await response.json()
+      return { status: response.status, data }
+    })
+    
+    console.log(`Auth Response Status: ${authResponse.status}`)
+    console.log("Auth Response:", JSON.stringify(authResponse.data, null, 2))
     
   } catch (error) {
-    console.error('Test failed:', error)
+    console.error("Test failed:", error)
+  } finally {
+    await browser.close()
+    console.log("\n✓ Test completed")
   }
 }
 
-// Alternative: Test with hardcoded session
-async function testWithHardcodedSession() {
-  console.log('\n\n📝 Alternative: Test with hardcoded session\n')
-  
-  // You can get these values from your browser's localStorage after logging in
-  // Look for sb-*-auth-token in Application > Local Storage
-  const EXAMPLE_ACCESS_TOKEN = 'your-access-token-here'
-  const EXAMPLE_REFRESH_TOKEN = 'your-refresh-token-here'
-  
-  console.log('To get your tokens:')
-  console.log('1. Log in at http://localhost:3001')
-  console.log('2. Open DevTools > Application > Local Storage')
-  console.log('3. Find the sb-*-auth-token key')
-  console.log('4. Copy the access_token and refresh_token values')
-  console.log('5. Update this script with those values\n')
-
-  // Show how to construct the cookie
-  const projectRef = 'bknpldydmkzupsfagnva' // from your Supabase URL
-  const cookieName = `sb-${projectRef}-auth-token`
-  
-  console.log(`Cookie name should be: ${cookieName}`)
-  console.log('\nExample cookie format:')
-  console.log(`${cookieName}={"access_token":"...", "refresh_token":"...", ...}`)
-}
-
-// Run tests
-async function main() {
-  await testApiKeysWithBrowserAuth()
-  await testWithHardcodedSession()
-}
-
-main().catch(console.error)
+testBrowserAuth().catch(console.error)
