@@ -183,13 +183,20 @@ class ClaudeCodeHelper {
       // Call Ollama with timeout handling for long operations
       console.log('🔄 Generating code... This may take a few minutes.')
       
+      // Write prompt to temp file to avoid shell escaping issues
+      const tempFile = `/tmp/ollama-prompt-${Date.now()}.txt`
+      await fs.writeFile(tempFile, prompt, 'utf-8')
+      
       const { stdout, stderr } = await execAsync(
-        `echo '${prompt.replace(/'/g, "'\\''")}' | ollama run ${this.ollamaModel}`,
+        `ollama run ${this.ollamaModel} < ${tempFile}`,
         { 
           maxBuffer: 50 * 1024 * 1024, // 50MB buffer for larger outputs
           timeout: 5 * 60 * 1000 // 5 minute timeout
         }
       )
+      
+      // Clean up temp file
+      await fs.unlink(tempFile).catch(() => {})
 
       // Extract code from response
       const code = this.extractCode(stdout)
@@ -310,8 +317,27 @@ Completed code:`
         .join('\n\n')
     }
 
-    // If no code blocks, assume entire response is code
-    return response.trim()
+    // Check for inline code without language specifier
+    const simpleCodeBlockMatch = response.match(/```\n([\s\S]*?)```/g)
+    if (simpleCodeBlockMatch) {
+      return simpleCodeBlockMatch
+        .map(block => block.replace(/```\n/, '').replace(/```$/, ''))
+        .join('\n\n')
+    }
+
+    // Handle DeepSeek's special tokens
+    const cleaned = response
+      .replace(/<｜.*?｜>/g, '') // Remove special tokens
+      .replace(/\n\n+/g, '\n\n') // Normalize newlines
+      .trim()
+
+    // If it looks like code (has function/import/const), return it
+    if (cleaned.match(/^(import|export|const|let|var|function|class|interface|type)/m)) {
+      return cleaned
+    }
+
+    // Otherwise assume entire response is code
+    return cleaned
   }
 
   private extractExplanation(response: string): string {
