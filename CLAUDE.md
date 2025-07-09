@@ -62,6 +62,10 @@ npm test:e2e            # Run Playwright tests
 npm run db:reset        # Reset local database
 npm run db:types        # Generate TypeScript types
 
+# IMPORTANT: Database password contains @ symbol
+# When using supabase db push, URL-encode the password:
+# npx supabase db push --db-url "postgresql://postgres:Ctigroup1%40@db.bknpldydmkzupsfagnva.supabase.co:5432/postgres"
+
 # Build
 npm run build           # Production build
 npm run start           # Start production server
@@ -284,7 +288,28 @@ Can LLM figure this out with existing tools?
     └─ No → Add a simple tool (not a feature!)
 ```
 
-## 🔴 CRITICAL: Database Type Synchronization
+## 🔴 CRITICAL: Database Operations
+
+### Database Password Encoding
+The database password contains an `@` symbol which MUST be URL-encoded as `%40` when using connection strings:
+
+```bash
+# ❌ WRONG - Will fail authentication
+npx supabase db push --db-url "postgresql://postgres:Ctigroup1@@db.bknpldydmkzupsfagnva.supabase.co:5432/postgres"
+
+# ✅ CORRECT - URL-encoded password
+npx supabase db push --db-url "postgresql://postgres:Ctigroup1%40@db.bknpldydmkzupsfagnva.supabase.co:5432/postgres"
+
+# ✅ BETTER - Use the helper script that handles encoding automatically
+npx tsx utils/db-push.ts
+```
+
+**Helper Utilities for Database Operations:**
+- `npx tsx utils/database-utils.ts encode` - URL-encode passwords
+- `npx tsx utils/database-utils.ts url` - Get full database URL with encoding
+- `npx tsx utils/db-push.ts` - Push migrations with automatic password encoding
+
+### Database Type Synchronization
 
 **After ANY database schema change, you MUST:**
 

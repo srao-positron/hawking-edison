@@ -59,7 +59,8 @@ To apply this migration:
 3. Click "Run" to execute the migration
 
 Alternatively, you can use the Supabase CLI once it's properly configured:
-   npx supabase db push --db-url "postgresql://postgres:${process.env.DATABASE_PASSWORD}@db.bknpldydmkzupsfagnva.supabase.co:5432/postgres"
+   # Note: Password must be URL-encoded if it contains special characters like @
+   npx supabase db push --db-url "postgresql://postgres:Ctigroup1%40@db.bknpldydmkzupsfagnva.supabase.co:5432/postgres"
 `)
 
     // Let's at least verify what tables currently exist
