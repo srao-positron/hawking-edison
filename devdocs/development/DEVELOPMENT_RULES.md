@@ -42,7 +42,27 @@ TodoWrite([
 
 ---
 
-## Rule 3: Search Before You Build
+## Rule 3: No Polling - Use Realtime Only
+
+**ABSOLUTE RULE**: Never implement polling mechanisms.
+
+### ❌ FORBIDDEN:
+- `setInterval()` for checking updates
+- `setTimeout()` recursion for status checks
+- While loops waiting for completion
+- Any form of periodic HTTP requests
+
+### ✅ REQUIRED:
+- Server-Sent Events (SSE) for streaming
+- Supabase Realtime for database updates
+- WebSockets for bidirectional communication
+- Event-driven architectures (SNS/SQS)
+
+**If you think you need polling, STOP and DISCUSS with the user.**
+
+---
+
+## Rule 4: Search Before You Build
 
 **ALWAYS search the existing codebase first:**
 
@@ -62,7 +82,7 @@ TodoWrite([
 
 ---
 
-## Rule 4: API-First, No Exceptions
+## Rule 5: API-First, No Exceptions
 
 ```typescript
 // ❌ NEVER: Business logic in browser
@@ -80,7 +100,7 @@ async function calculate(data) {
 
 ---
 
-## Rule 5: Test-First Development
+## Rule 6: Test-First Development
 
 ```typescript
 // Write test BEFORE implementation
@@ -98,7 +118,7 @@ describe('New Feature', () => {
 
 ---
 
-## Rule 6: Helper Scripts Required
+## Rule 7: Helper Scripts Required
 
 For every feature, create helpers in `utils/`:
 
@@ -110,7 +130,7 @@ For every feature, create helpers in `utils/`:
 
 ---
 
-## Rule 7: No Types, No Templates
+## Rule 8: No Types, No Templates
 
 ```typescript
 // ❌ NEVER create:
@@ -125,7 +145,7 @@ function runInteraction(agents, instructions) // Natural language
 
 ---
 
-## Rule 8: Authentication Always
+## Rule 9: Authentication Always
 
 ```typescript
 // Every API endpoint MUST support BOTH:
@@ -141,7 +161,7 @@ if (!user) return 401;
 
 ---
 
-## Rule 9: Consistent API Responses
+## Rule 10: Consistent API Responses
 
 ```typescript
 // ALWAYS return:
@@ -157,7 +177,7 @@ if (!user) return 401;
 
 ---
 
-## Rule 10: Document Tool Usage
+## Rule 11: Document Tool Usage
 
 When creating/modifying tools:
 1. Rich parameter documentation
@@ -236,7 +256,7 @@ After coding:
 
 ---
 
-## Rule 11: Delete Old Code - No Dead Code
+## Rule 12: Delete Old Code - No Dead Code
 
 **ALWAYS delete old, unused code when replacing features:**
 
@@ -267,7 +287,7 @@ After coding:
 
 ---
 
-## Rule 12: No Pushing with Failing Tests
+## Rule 13: No Pushing with Failing Tests
 
 **NEVER push code with failing tests:**
 
@@ -288,7 +308,7 @@ npm run typecheck # Must pass
 
 ---
 
-## Rule 13: Test Email Addresses
+## Rule 14: Test Email Addresses
 
 **ALWAYS use @hawkingedison.com domain for test emails:**
 
@@ -308,7 +328,7 @@ This prevents email bouncebacks and maintains our sender reputation.
 
 ---
 
-## Rule 14: Update Tests When UI Changes
+## Rule 15: Update Tests When UI Changes
 
 **ALWAYS update tests when changing the user interface:**
 
@@ -338,7 +358,7 @@ This prevents email bouncebacks and maintains our sender reputation.
 
 ---
 
-## Rule 15: Use Claude Code Helper for Code Generation
+## Rule 16: Use Claude Code Helper for Code Generation
 
 **ALWAYS use the Claude Code Helper tool with CodeLlama for routine code tasks:**
 
@@ -376,7 +396,7 @@ npx tsx utils/claude-code-helper.ts custom "Create a debounce hook"
 
 ---
 
-## Rule 16: Separate Local and Production Tests
+## Rule 17: Separate Local and Production Tests
 
 **ALWAYS use the appropriate test suite for your context:**
 
@@ -409,7 +429,7 @@ npm run test:e2e:ui
 
 ---
 
-## Rule 17: Route Groups - Never Duplicate Pages
+## Rule 18: Route Groups - Never Duplicate Pages
 
 **ALWAYS check for existing routes before creating new pages:**
 
@@ -442,7 +462,7 @@ npm run test:e2e:ui
 
 ---
 
-## Rule 18: Cookie Handling in API Routes
+## Rule 19: Cookie Handling in API Routes
 
 **ALWAYS await cookies() in Next.js API routes:**
 
@@ -469,7 +489,7 @@ export async function GET() {
 
 ---
 
-## Rule 19: Browser-Specific Test Handling
+## Rule 20: Browser-Specific Test Handling
 
 **ALWAYS handle browser differences in E2E tests:**
 
@@ -507,7 +527,7 @@ await page.waitForURL('**/expected-path')
 
 ---
 
-## Rule 20: Flexible Test Selectors
+## Rule 21: Flexible Test Selectors
 
 **ALWAYS use flexible selectors that survive UI changes:**
 
@@ -540,7 +560,7 @@ await page.locator('button[type="submit"], button:has-text("Sign in")').click()
 
 ---
 
-## Rule 21: Test Maintenance Checklist
+## Rule 22: Test Maintenance Checklist
 
 **ALWAYS follow this checklist when changing UI:**
 
@@ -574,7 +594,7 @@ npm run test:e2e:local                        # Full cross-browser
 
 ---
 
-## Rule 22: Project Structure Validation
+## Rule 23: Project Structure Validation
 
 **ALWAYS verify project structure consistency:**
 
@@ -598,7 +618,7 @@ npm run test:e2e:local                        # Full cross-browser
 
 ---
 
-## Rule 23: Login Helpers Must Be Robust
+## Rule 24: Login Helpers Must Be Robust
 
 **ALWAYS use the robust login helper pattern in tests:**
 
@@ -658,7 +678,7 @@ async function loginAsTestUser(page: Page) {
 
 ---
 
-## Rule 24: Work Isn't Done Until CI Passes
+## Rule 25: Work Isn't Done Until CI Passes
 
 **MANDATORY**: A feature or fix is NOT complete until:
 
@@ -704,7 +724,7 @@ async function loginAsTestUser(page: Page) {
 
 ---
 
-## Rule 25: Database Type Synchronization MANDATORY
+## Rule 26: Database Type Synchronization MANDATORY
 
 **ALWAYS sync TypeScript types after ANY database schema change:**
 

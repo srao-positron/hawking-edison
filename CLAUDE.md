@@ -275,9 +275,11 @@ grep -r "interface.*Template" src/
 - **Don't** build features
 - **Don't** parse intent
 - **Don't** create types
+- **Don't** implement polling - EVER
 - **Do** build simple tools
 - **Do** trust the LLM
 - **Do** embrace emergence
+- **Do** use realtime/streaming (SSE, WebSockets, Supabase Realtime)
 
 ### Quick Decision Tree
 ```
@@ -287,6 +289,50 @@ Can LLM figure this out with existing tools?
     ├─ Yes → Let it run
     └─ No → Add a simple tool (not a feature!)
 ```
+
+## 🔴 CRITICAL: No Polling - Use Realtime
+
+**ABSOLUTE RULE**: Never implement polling. If you think you need polling, STOP and discuss with the user.
+
+### ✅ CORRECT Approaches:
+- **Server-Sent Events (SSE)** for streaming responses
+- **Supabase Realtime** for database updates
+- **WebSockets** for bidirectional communication
+- **Event-driven** architectures (SNS/SQS)
+
+### ❌ NEVER Do This:
+```javascript
+// ❌ WRONG - No setInterval polling
+setInterval(() => checkForUpdates(), 1000)
+
+// ❌ WRONG - No recursive setTimeout polling
+function poll() {
+  fetch('/api/status').then(() => setTimeout(poll, 1000))
+}
+
+// ❌ WRONG - No while loops checking status
+while (status !== 'complete') {
+  await checkStatus()
+}
+```
+
+### ✅ Instead Do This:
+```javascript
+// ✅ CORRECT - Supabase Realtime
+supabase
+  .channel('updates')
+  .on('postgres_changes', { event: '*', schema: 'public' }, handleUpdate)
+  .subscribe()
+
+// ✅ CORRECT - Server-Sent Events
+const eventSource = new EventSource('/api/stream')
+eventSource.onmessage = handleUpdate
+
+// ✅ CORRECT - Event-driven with SNS/SQS
+await publishToSNS({ event: 'process', data })
+```
+
+**If you need real-time updates and these methods won't work, DISCUSS with the user FIRST.**
 
 ## 🔴 CRITICAL: Database Operations
 
