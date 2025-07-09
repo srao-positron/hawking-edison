@@ -1,4 +1,5 @@
 // API Client - Centralized API communication with auth, retries, and rate limiting
+import { supabase } from './supabase'
 
 export interface ApiClientConfig {
   maxRetries?: number
@@ -26,28 +27,15 @@ class ApiClient {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    try {
-      // Get session from our API endpoint that handles cross-domain cookies
-      const response = await fetch('/api/auth/session', {
-        credentials: 'include'
-      })
-      
-      if (!response.ok) {
-        throw new Error('Failed to get session')
-      }
-      
-      const { session } = await response.json()
-      
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
-      return {
-        'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
-      }
-    } catch (error) {
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
       throw new Error('Not authenticated')
+    }
+
+    return {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json'
     }
   }
 
@@ -289,54 +277,76 @@ export const api = {
     }
   },
 
-  // API Key endpoints
+  // API Key endpoints - Direct calls to Supabase Edge Functions
   apiKeys: {
     list: async () => {
-      const response = await apiClient.get<{ 
-        data: { 
-          keys: Array<{
-            id: string
-            name: string
-            key_prefix: string
-            created_at: string
-            last_used_at: string | null
-            expires_at: string | null
-            revoked_at: string | null
-            isActive: boolean
-            isExpired: boolean
-            isRevoked: boolean
-          }> 
-        } 
-      }>('/api/keys')
-      return response.data
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://service.hawkingedison.com'
+      const response = await fetch(`${supabaseUrl}/functions/v1/auth-api-keys`, {
+        method: 'GET',
+        headers: await apiClient.getAuthHeaders(),
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to fetch API keys')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {
-      const response = await apiClient.post<{ 
-        data: {
-          id: string
-          name: string
-          key_prefix: string
-          created_at: string
-          expires_at: string | null
-          key: string
-        } 
-      }>('/api/keys', { name, expiresInDays, environment })
-      return response.data
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://service.hawkingedison.com'
+      const response = await fetch(`${supabaseUrl}/functions/v1/auth-api-keys`, {
+        method: 'POST',
+        headers: await apiClient.getAuthHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ name, expiresInDays, environment })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to create API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     revoke: async (id: string) => {
-      const response = await apiClient.patch<{ 
-        data: { message: string } 
-      }>(`/api/keys/${id}`, { action: 'revoke' })
-      return response.data
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://service.hawkingedison.com'
+      const response = await fetch(`${supabaseUrl}/functions/v1/auth-api-keys/${id}`, {
+        method: 'PATCH',
+        headers: await apiClient.getAuthHeaders(),
+        credentials: 'include',
+        body: JSON.stringify({ action: 'revoke' })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to revoke API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     delete: async (id: string) => {
-      const response = await apiClient.delete<{ 
-        data: { message: string } 
-      }>(`/api/keys/${id}`)
-      return response.data
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://service.hawkingedison.com'
+      const response = await fetch(`${supabaseUrl}/functions/v1/auth-api-keys/${id}`, {
+        method: 'DELETE',
+        headers: await apiClient.getAuthHeaders(),
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to delete API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     }
   }
 }
