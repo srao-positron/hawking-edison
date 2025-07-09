@@ -5,6 +5,7 @@ import { verifyAuth } from '../_shared/auth.ts'
 import { createResponse, createErrorResponse } from '../_shared/response.ts'
 import { createLogger } from '../_shared/logger.ts'
 import { llm, LLMProvider } from '../_shared/llm.ts'
+import { publishToSNS, shouldUseOrchestration } from '../_shared/aws-sns.ts'
 
 const logger = createLogger('interact')
 
@@ -181,7 +182,57 @@ Deno.serve(async (req) => {
       return createErrorResponse('DB_ERROR', 'Failed to save message')
     }
     
-    // Record interaction start
+    // Check if this request should use orchestration
+    const useOrchestration = mode === 'async' || shouldUseOrchestration(input)
+    
+    if (useOrchestration) {
+      // Create orchestration session
+      const { data: session, error: sessionError } = await supabase
+        .from('orchestration_sessions')
+        .insert({
+          user_id: user!.id,
+          status: 'pending',
+          messages: [
+            ...messages,
+            { role: 'user', content: input }
+          ],
+          metadata: {
+            thread_id: threadId,
+            provider: provider || 'claude-3-opus'
+          }
+        })
+        .select()
+        .single()
+      
+      if (sessionError) {
+        logger.error('Failed to create orchestration session', sessionError)
+        return createErrorResponse('DB_ERROR', 'Failed to create orchestration session')
+      }
+      
+      // Publish to SNS to start orchestration
+      const published = await publishToSNS({
+        sessionId: session.id,
+        action: 'start',
+        userId: user!.id,
+        input
+      })
+      
+      if (!published) {
+        // Fallback to synchronous processing if SNS publish fails
+        logger.warn('Failed to publish to SNS, falling back to sync processing')
+      } else {
+        // Return immediately with session ID for async processing
+        return createResponse({
+          sessionId: session.id,
+          threadId: threadId,
+          status: 'processing',
+          message: 'Your request is being processed. You can check the status using the session ID.',
+          async: true
+        })
+      }
+    }
+
+    // Record interaction start for synchronous processing
     const { data: interaction, error: dbError } = await supabase
       .from('interactions')
       .insert({

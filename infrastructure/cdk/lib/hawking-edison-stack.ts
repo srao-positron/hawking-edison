@@ -141,12 +141,13 @@ export class HawkingEdisonStack extends cdk.Stack {
       description: 'ARN of the Edge Function AWS credentials secret',
     })
 
-    // Create poller Lambda to check for pending orchestration sessions
-    const pollerFunction = new lambdaNodejs.NodejsFunction(this, 'OrchestrationPoller', {
-      entry: path.join(__dirname, '../lambda/orchestration-poller.ts'),
+    // Create resumption Lambda to handle orchestration timeouts
+    // This is triggered by the orchestrator when it needs to resume
+    const resumptionFunction = new lambdaNodejs.NodejsFunction(this, 'OrchestrationResumption', {
+      entry: path.join(__dirname, '../lambda/orchestration-resumption.ts'),
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_20_X,
-      timeout: cdk.Duration.minutes(1),
+      timeout: cdk.Duration.seconds(30),
       memorySize: 256,
       environment: {
         SUPABASE_URL: process.env.SUPABASE_URL || 'PLACEHOLDER',
@@ -162,23 +163,40 @@ export class HawkingEdisonStack extends cdk.Stack {
     })
 
     // Grant permissions to read from secrets
-    apiKeysSecret.grantRead(pollerFunction)
+    apiKeysSecret.grantRead(resumptionFunction)
 
     // Grant permissions to publish to SNS
-    orchestrationTopic.grantPublish(pollerFunction)
+    orchestrationTopic.grantPublish(resumptionFunction)
 
-    // Create scheduled rule to run every minute
-    const pollerRule = new events.Rule(this, 'OrchestrationPollerRule', {
-      schedule: events.Schedule.rate(cdk.Duration.minutes(1)),
-      description: 'Trigger orchestration poller every minute',
+    // Create DynamoDB table for tracking active sessions
+    // This allows us to avoid polling and only process when needed
+    const activeSessionsTable = new cdk.aws_dynamodb.Table(this, 'ActiveOrchestrationSessions', {
+      tableName: 'hawking-edison-active-sessions',
+      partitionKey: {
+        name: 'sessionId',
+        type: cdk.aws_dynamodb.AttributeType.STRING,
+      },
+      timeToLiveAttribute: 'ttl',
+      billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+      removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev - change to RETAIN for prod
     })
 
-    // Add Lambda as target
-    pollerRule.addTarget(new targets.LambdaFunction(pollerFunction))
+    // Grant orchestrator permissions to read/write active sessions
+    activeSessionsTable.grantReadWriteData(orchestratorFunction)
+    activeSessionsTable.grantReadWriteData(resumptionFunction)
 
-    new cdk.CfnOutput(this, 'PollerFunctionArn', {
-      value: pollerFunction.functionArn,
-      description: 'ARN of the orchestration poller Lambda function',
+    // Add environment variable for table name
+    orchestratorFunction.addEnvironment('ACTIVE_SESSIONS_TABLE', activeSessionsTable.tableName)
+    resumptionFunction.addEnvironment('ACTIVE_SESSIONS_TABLE', activeSessionsTable.tableName)
+
+    new cdk.CfnOutput(this, 'ResumptionFunctionArn', {
+      value: resumptionFunction.functionArn,
+      description: 'ARN of the orchestration resumption Lambda function',
+    })
+
+    new cdk.CfnOutput(this, 'ActiveSessionsTableName', {
+      value: activeSessionsTable.tableName,
+      description: 'Name of the active sessions DynamoDB table',
     })
   }
 }

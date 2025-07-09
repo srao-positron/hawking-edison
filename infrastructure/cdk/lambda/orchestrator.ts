@@ -1,10 +1,12 @@
 import { SQSHandler, SQSEvent } from 'aws-lambda'
 import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
+import { DynamoDBClient, PutItemCommand, DeleteItemCommand } from '@aws-sdk/client-dynamodb'
 import { createClient } from '@supabase/supabase-js'
 
 const sns = new SNSClient({ region: process.env.AWS_REGION })
 const secretsManager = new SecretsManagerClient({ region: process.env.AWS_REGION })
+const dynamodb = new DynamoDBClient({ region: process.env.AWS_REGION })
 
 interface OrchestrationEvent {
   sessionId: string
@@ -53,6 +55,35 @@ async function getSupabaseCredentials(): Promise<{ url: string; serviceRoleKey: 
     url: secrets.SUPABASE_URL,
     serviceRoleKey: secrets.SUPABASE_SERVICE_ROLE_KEY
   }
+}
+
+// Track active session in DynamoDB
+async function trackActiveSession(sessionId: string, userId: string) {
+  const ttl = Math.floor(Date.now() / 1000) + 3600 // 1 hour TTL
+  
+  const command = new PutItemCommand({
+    TableName: process.env.ACTIVE_SESSIONS_TABLE,
+    Item: {
+      sessionId: { S: sessionId },
+      userId: { S: userId },
+      startTime: { N: String(Date.now()) },
+      ttl: { N: String(ttl) }
+    }
+  })
+  
+  await dynamodb.send(command)
+}
+
+// Remove active session from DynamoDB
+async function removeActiveSession(sessionId: string) {
+  const command = new DeleteItemCommand({
+    TableName: process.env.ACTIVE_SESSIONS_TABLE,
+    Key: {
+      sessionId: { S: sessionId }
+    }
+  })
+  
+  await dynamodb.send(command)
 }
 
 // Load or create orchestration session
@@ -109,6 +140,9 @@ async function completeSession(supabase: any, session: Session, response: string
   if (error) {
     throw new Error(`Failed to update final response: ${error.message}`)
   }
+  
+  // Remove from active sessions
+  await removeActiveSession(session.id)
 }
 
 // Handle timeout by queueing resumption
@@ -151,6 +185,9 @@ async function handleError(supabase: any, sessionId: string, error: any) {
   if (updateError) {
     console.error('Failed to update error status:', updateError)
   }
+  
+  // Remove from active sessions on error
+  await removeActiveSession(sessionId)
 }
 
 // Placeholder for LLM calls with tools
@@ -195,6 +232,9 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
     try {
       // Load session
       const session = await loadSession(supabase, message.sessionId)
+      
+      // Track this as an active session
+      await trackActiveSession(session.id, session.user_id)
       
       // Update status to running
       await updateSession(supabase, session.id, { 
