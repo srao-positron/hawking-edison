@@ -21,8 +21,16 @@ export async function updateSession(request: NextRequest) {
             request,
           })
           cookiesToSet.forEach(({ name, value, options }) => {
-            // Use default cookie options for now - Supabase handles domain correctly
-            supabaseResponse.cookies.set(name, value, options)
+            // Set cookies with domain .hawkingedison.com to work across all subdomains
+            const cookieOptions = {
+              ...options,
+              domain: process.env.NODE_ENV === 'production' ? '.hawkingedison.com' : options?.domain,
+              path: '/',
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax' as const,
+              httpOnly: true
+            }
+            supabaseResponse.cookies.set(name, value, cookieOptions)
           })
         },
       },

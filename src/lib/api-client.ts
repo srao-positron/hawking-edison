@@ -278,14 +278,21 @@ export const api = {
     }
   },
 
-  // API Key endpoints - Use local proxy to avoid cross-domain issues
+  // API Key endpoints - Call Edge Functions directly
   apiKeys: {
     list: async () => {
-      // Bypass the apiClient to avoid auth check in browser
-      const response = await fetch('/api/api-keys', {
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'GET',
         credentials: 'include',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         }
       })
@@ -300,10 +307,18 @@ export const api = {
     },
     
     create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {
-      const response = await fetch('/api/api-keys', {
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'POST',
         credentials: 'include',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ name, expiresInDays, environment })
@@ -319,13 +334,21 @@ export const api = {
     },
     
     revoke: async (id: string) => {
-      const response = await fetch(`/api/api-keys/${id}`, {
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'PATCH',
         credentials: 'include',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ action: 'revoke' })
+        body: JSON.stringify({ id, action: 'revoke' })
       })
       
       if (!response.ok) {
@@ -338,12 +361,21 @@ export const api = {
     },
     
     delete: async (id: string) => {
-      const response = await fetch(`/api/api-keys/${id}`, {
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {
+          'Authorization': `Bearer ${session.access_token}`,
           'Content-Type': 'application/json'
-        }
+        },
+        body: JSON.stringify({ id })
       })
       
       if (!response.ok) {

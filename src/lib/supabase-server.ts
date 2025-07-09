@@ -15,7 +15,16 @@ export function createClient(cookieStore: ReadonlyRequestCookies) {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => {
-              cookieStore.set(name, value, options)
+              // Set cookies with domain .hawkingedison.com in production
+              const cookieOptions = {
+                ...options,
+                domain: process.env.NODE_ENV === 'production' ? '.hawkingedison.com' : options?.domain,
+                path: '/',
+                secure: process.env.NODE_ENV === 'production',
+                sameSite: 'lax' as const,
+                httpOnly: true
+              }
+              cookieStore.set(name, value, cookieOptions)
             })
           } catch {
             // The `setAll` method was called from a Server Component.
