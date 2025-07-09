@@ -48,7 +48,7 @@ async function verifyApiKeyAuth(apiKey: string, req: Request): Promise<{ error: 
   // Look up the API key
   const { data: apiKeyRecord, error } = await supabase
     .from('api_keys')
-    .select('id, user_id, name, expires_at, revoked_at')
+    .select('id, user_id, name, expires_at')
     .eq('key_hash', keyHash)
     .single()
   
@@ -59,13 +59,8 @@ async function verifyApiKeyAuth(apiKey: string, req: Request): Promise<{ error: 
     }
   }
   
-  // Check if revoked
-  if (apiKeyRecord.revoked_at) {
-    return {
-      error: createErrorResponse('AUTH_INVALID', 'API key has been revoked', 401, req.headers.get("origin")),
-      user: null
-    }
-  }
+  // Note: revoked_at column doesn't exist in production yet
+  // Keys are deleted instead of revoked
   
   // Check if expired
   if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
