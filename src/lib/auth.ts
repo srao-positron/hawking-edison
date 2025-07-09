@@ -1,5 +1,5 @@
 // Authentication utilities for client-side
-import { supabase } from './supabase'
+import { getBrowserClient } from './supabase-browser'
 import { User } from '@supabase/supabase-js'
 
 export interface AuthError {
@@ -15,6 +15,7 @@ export interface AuthState {
 
 // Sign up with email
 export async function signUp(email: string, password: string) {
+  const supabase = getBrowserClient()
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -32,6 +33,7 @@ export async function signUp(email: string, password: string) {
 
 // Sign in with email
 export async function signIn(email: string, password: string) {
+  const supabase = getBrowserClient()
   const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password
@@ -46,6 +48,7 @@ export async function signIn(email: string, password: string) {
 
 // Sign out
 export async function signOut() {
+  const supabase = getBrowserClient()
   const { error } = await supabase.auth.signOut()
 
   if (error) {
@@ -57,6 +60,7 @@ export async function signOut() {
 
 // Get current user
 export async function getCurrentUser() {
+  const supabase = getBrowserClient()
   const { data: { user }, error } = await supabase.auth.getUser()
 
   if (error) {
@@ -68,6 +72,7 @@ export async function getCurrentUser() {
 
 // Reset password
 export async function resetPassword(email: string) {
+  const supabase = getBrowserClient()
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
     redirectTo: `${window.location.origin}/auth/reset-password`
   })
@@ -81,6 +86,7 @@ export async function resetPassword(email: string) {
 
 // Update password
 export async function updatePassword(newPassword: string) {
+  const supabase = getBrowserClient()
   const { error } = await supabase.auth.updateUser({
     password: newPassword
   })
@@ -94,6 +100,7 @@ export async function updatePassword(newPassword: string) {
 
 // Resend verification email
 export async function resendVerificationEmail(email: string) {
+  const supabase = getBrowserClient()
   const { error } = await supabase.auth.resend({
     type: 'signup',
     email,

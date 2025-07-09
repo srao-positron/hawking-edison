@@ -290,7 +290,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
       console.log('[API Keys] Edge Function URL:', url)
       console.log('[API Keys] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
 
@@ -334,7 +334,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'POST',
         credentials: 'include',
         headers: {
@@ -361,7 +361,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'PATCH',
         credentials: 'include',
         headers: {
@@ -388,7 +388,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
         method: 'DELETE',
         credentials: 'include',
         headers: {

@@ -1,7 +1,7 @@
 // useAuth hook - Authentication state management
 import { useEffect, useState } from 'react'
 import { User } from '@supabase/supabase-js'
-import { supabase } from '@/lib/supabase'
+import { getBrowserClient } from '@/lib/supabase-browser'
 import { AuthState } from '@/lib/auth'
 
 export function useAuth() {
@@ -10,6 +10,8 @@ export function useAuth() {
   const [error, setError] = useState<AuthState['error']>(null)
 
   useEffect(() => {
+    const supabase = getBrowserClient()
+    
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       if (error) {
@@ -32,6 +34,7 @@ export function useAuth() {
   }, [])
 
   const signOut = async () => {
+    const supabase = getBrowserClient()
     const { error } = await supabase.auth.signOut()
     if (error) {
       setError({ message: error.message })
