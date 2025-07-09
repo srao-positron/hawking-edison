@@ -9,6 +9,7 @@ import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources'
 import * as iam from 'aws-cdk-lib/aws-iam'
 import * as events from 'aws-cdk-lib/aws-events'
 import * as targets from 'aws-cdk-lib/aws-events-targets'
+import * as dynamodb from 'aws-cdk-lib/aws-dynamodb'
 import { Construct } from 'constructs'
 import * as path from 'path'
 
@@ -76,7 +77,7 @@ export class HawkingEdisonStack extends cdk.Stack {
         minify: false,
         sourceMap: true,
         target: 'es2022',
-        externalModules: ['aws-sdk'],
+        externalModules: [],
       },
     })
 
@@ -97,7 +98,7 @@ export class HawkingEdisonStack extends cdk.Stack {
     // Grant Edge Functions permission to publish to SNS
     // This requires creating an IAM user for Supabase Edge Functions
     const edgeFunctionUser = new iam.User(this, 'EdgeFunctionUser', {
-      userName: 'hawking-edison-edge-functions',
+      userName: `hawking-edison-edge-functions-${this.stackName}`,
     })
 
     // Create access key for Edge Function user
@@ -158,7 +159,7 @@ export class HawkingEdisonStack extends cdk.Stack {
         minify: false,
         sourceMap: true,
         target: 'es2022',
-        externalModules: ['aws-sdk'],
+        externalModules: [],
       },
     })
 
@@ -170,14 +171,14 @@ export class HawkingEdisonStack extends cdk.Stack {
 
     // Create DynamoDB table for tracking active sessions
     // This allows us to avoid polling and only process when needed
-    const activeSessionsTable = new cdk.aws_dynamodb.Table(this, 'ActiveOrchestrationSessions', {
+    const activeSessionsTable = new dynamodb.Table(this, 'ActiveOrchestrationSessions', {
       tableName: 'hawking-edison-active-sessions',
       partitionKey: {
         name: 'sessionId',
-        type: cdk.aws_dynamodb.AttributeType.STRING,
+        type: dynamodb.AttributeType.STRING,
       },
       timeToLiveAttribute: 'ttl',
-      billingMode: cdk.aws_dynamodb.BillingMode.PAY_PER_REQUEST,
+      billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev - change to RETAIN for prod
     })
 
