@@ -14,6 +14,48 @@ export type Database = {
   }
   public: {
     Tables: {
+      agent_conversations: {
+        Row: {
+          agent_specification: string
+          created_at: string | null
+          id: string
+          messages: Json
+          parent_thread_id: string
+          tool_execution_id: string | null
+        }
+        Insert: {
+          agent_specification: string
+          created_at?: string | null
+          id?: string
+          messages?: Json
+          parent_thread_id: string
+          tool_execution_id?: string | null
+        }
+        Update: {
+          agent_specification?: string
+          created_at?: string | null
+          id?: string
+          messages?: Json
+          parent_thread_id?: string
+          tool_execution_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversations_parent_thread_id_fkey"
+            columns: ["parent_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_conversations_tool_execution_id_fkey"
+            columns: ["tool_execution_id"]
+            isOneToOne: false
+            referencedRelation: "tool_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_memories: {
         Row: {
           content: Json
@@ -88,6 +130,90 @@ export type Database = {
         }
         Relationships: []
       }
+      chat_messages: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          metadata: Json | null
+          model: string | null
+          role: string
+          thread_id: string
+          tokens_used: number | null
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          model?: string | null
+          role: string
+          thread_id: string
+          tokens_used?: number | null
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          metadata?: Json | null
+          model?: string | null
+          role?: string
+          thread_id?: string
+          tokens_used?: number | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_messages_thread_id_idx"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      chat_threads: {
+        Row: {
+          created_at: string
+          id: string
+          last_message_at: string | null
+          message_count: number
+          metadata: Json | null
+          title: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          metadata?: Json | null
+          title?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_message_at?: string | null
+          message_count?: number
+          metadata?: Json | null
+          title?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       interactions: {
         Row: {
           created_at: string | null
@@ -148,6 +274,79 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_thoughts: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          thought_type: string
+          thread_id: string | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          thought_type: string
+          thread_id?: string | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          thought_type?: string
+          thread_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "llm_thoughts_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          created_at: string | null
+          id: string
+          metadata: Json | null
+          role: string
+          thread_id: string
+          tool_calls: Json | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role: string
+          thread_id: string
+          tool_calls?: Json | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          id?: string
+          metadata?: Json | null
+          role?: string
+          thread_id?: string
+          tool_calls?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       orchestration_sessions: {
         Row: {
           completed_at: string | null
@@ -160,8 +359,11 @@ export type Database = {
           messages: Json
           started_at: string | null
           status: string
+          streaming_enabled: boolean | null
+          thread_id: string | null
           tool_state: Json | null
           total_tokens: number | null
+          ui_state: Json | null
           updated_at: string | null
           user_id: string | null
         }
@@ -176,8 +378,11 @@ export type Database = {
           messages?: Json
           started_at?: string | null
           status?: string
+          streaming_enabled?: boolean | null
+          thread_id?: string | null
           tool_state?: Json | null
           total_tokens?: number | null
+          ui_state?: Json | null
           updated_at?: string | null
           user_id?: string | null
         }
@@ -192,12 +397,23 @@ export type Database = {
           messages?: Json
           started_at?: string | null
           status?: string
+          streaming_enabled?: boolean | null
+          thread_id?: string | null
           tool_state?: Json | null
           total_tokens?: number | null
+          ui_state?: Json | null
           updated_at?: string | null
           user_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "orchestration_sessions_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       telemetry_events: {
         Row: {
@@ -229,39 +445,122 @@ export type Database = {
         }
         Relationships: []
       }
+      thread_hierarchy: {
+        Row: {
+          child_thread_id: string
+          created_at: string | null
+          id: string
+          parent_thread_id: string
+          relationship_type: string
+        }
+        Insert: {
+          child_thread_id: string
+          created_at?: string | null
+          id?: string
+          parent_thread_id: string
+          relationship_type: string
+        }
+        Update: {
+          child_thread_id?: string
+          created_at?: string | null
+          id?: string
+          parent_thread_id?: string
+          relationship_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "thread_hierarchy_child_thread_id_fkey"
+            columns: ["child_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "thread_hierarchy_parent_thread_id_fkey"
+            columns: ["parent_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      threads: {
+        Row: {
+          auto_generated_name: string | null
+          created_at: string | null
+          id: string
+          name: string
+          parent_thread_id: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          auto_generated_name?: string | null
+          created_at?: string | null
+          id?: string
+          name: string
+          parent_thread_id?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          auto_generated_name?: string | null
+          created_at?: string | null
+          id?: string
+          name?: string
+          parent_thread_id?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "threads_parent_thread_id_fkey"
+            columns: ["parent_thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tool_executions: {
         Row: {
           completed_at: string | null
           duration_ms: number | null
           id: string
           parameters: Json
+          produces_visualization: boolean | null
           result: Json | null
           session_id: string | null
           started_at: string | null
           status: string
           tool_name: string
+          visualization_id: string | null
         }
         Insert: {
           completed_at?: string | null
           duration_ms?: number | null
           id?: string
           parameters: Json
+          produces_visualization?: boolean | null
           result?: Json | null
           session_id?: string | null
           started_at?: string | null
           status?: string
           tool_name: string
+          visualization_id?: string | null
         }
         Update: {
           completed_at?: string | null
           duration_ms?: number | null
           id?: string
           parameters?: Json
+          produces_visualization?: boolean | null
           result?: Json | null
           session_id?: string | null
           started_at?: string | null
           status?: string
           tool_name?: string
+          visualization_id?: string | null
         }
         Relationships: [
           {
@@ -269,6 +568,13 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "orchestration_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tool_executions_visualization_id_fkey"
+            columns: ["visualization_id"]
+            isOneToOne: false
+            referencedRelation: "visualizations"
             referencedColumns: ["id"]
           },
         ]
@@ -311,6 +617,54 @@ export type Database = {
           },
         ]
       }
+      visualizations: {
+        Row: {
+          content: string
+          created_at: string | null
+          generation_prompt: string | null
+          id: string
+          metadata: Json | null
+          thread_id: string | null
+          tool_execution_id: string | null
+          type: string
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          generation_prompt?: string | null
+          id?: string
+          metadata?: Json | null
+          thread_id?: string | null
+          tool_execution_id?: string | null
+          type: string
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          generation_prompt?: string | null
+          id?: string
+          metadata?: Json | null
+          thread_id?: string | null
+          tool_execution_id?: string | null
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "visualizations_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "visualizations_tool_execution_id_fkey"
+            columns: ["tool_execution_id"]
+            isOneToOne: false
+            referencedRelation: "tool_executions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       telemetry_metrics: {
@@ -329,6 +683,10 @@ export type Database = {
       binary_quantize: {
         Args: { "": string } | { "": unknown }
         Returns: unknown
+      }
+      generate_thread_name: {
+        Args: { first_message: string }
+        Returns: string
       }
       halfvec_avg: {
         Args: { "": number[] }
