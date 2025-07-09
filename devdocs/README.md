@@ -11,9 +11,13 @@ Core system architecture and design documents
 - [ABSTRACT_MULTIAGENT_ARCHITECTURE.md](./architecture/ABSTRACT_MULTIAGENT_ARCHITECTURE.md) - No types, pure intelligence
 - [AGENT_MEMORY_ARCHITECTURE.md](./architecture/AGENT_MEMORY_ARCHITECTURE.md) - Memory system design
 - [API_FIRST_ARCHITECTURE.md](./architecture/API_FIRST_ARCHITECTURE.md) - API-first design principles
+- [API_KEY_ARCHITECTURE.md](./architecture/API_KEY_ARCHITECTURE.md) - API key authentication system
 - [ASYNC_ARCHITECTURE.md](./architecture/ASYNC_ARCHITECTURE.md) - Asynchronous processing with AWS
+- [DATABANK_SIMPLIFIED.md](./architecture/DATABANK_SIMPLIFIED.md) - User databank design
 - [GOAL_VERIFICATION_ARCHITECTURE.md](./architecture/GOAL_VERIFICATION_ARCHITECTURE.md) - Verification system
+- [INTELLIGENT_VISUALIZATION_SYSTEM.md](./architecture/INTELLIGENT_VISUALIZATION_SYSTEM.md) - Visualization architecture
 - [ORCHESTRATION_ARCHITECTURE.md](./architecture/ORCHESTRATION_ARCHITECTURE.md) - Orchestration system design
+- [USER_DATABANK_ARCHITECTURE.md](./architecture/USER_DATABANK_ARCHITECTURE.md) - Databank implementation
 
 ### 📁 [tools/](./tools/)
 Tool design and implementation documentation
@@ -35,7 +39,10 @@ Development guides and standards
 - [DEVELOPMENT_WORKFLOW.md](./development/DEVELOPMENT_WORKFLOW.md) - Development process
 - [MASTER_PLAN_V3.md](./development/MASTER_PLAN_V3.md) - Overall development plan
 - [CLAUDE_CODE_HELPER.md](./development/CLAUDE_CODE_HELPER.md) - Local LLM code generation tool
+- [LOCAL_LLM_CONTEXT.md](./development/LOCAL_LLM_CONTEXT.md) - Local LLM context and setup
+- [SYSTEM_PROMPTS.md](./development/SYSTEM_PROMPTS.md) - System prompt strategies
 - [TESTING_GUIDELINES.md](./development/TESTING_GUIDELINES.md) - Testing best practices
+- [USER_CONVERSATION_TEMPLATES.md](./development/USER_CONVERSATION_TEMPLATES.md) - Conversation patterns
 
 ### 📁 [guides/](./guides/)
 User guides and how-tos
@@ -44,6 +51,22 @@ User guides and how-tos
 ### 📁 [debugging/](./debugging/)
 Debugging and troubleshooting guides
 - [CROSS_BROWSER_AUTH_DEBUG.md](./debugging/CROSS_BROWSER_AUTH_DEBUG.md) - Cross-browser auth debugging
+
+### 📁 [configuration/](./configuration/)
+Configuration and setup guides
+- [SUPABASE_COOKIE_CONFIG.md](./configuration/SUPABASE_COOKIE_CONFIG.md) - Supabase cookie configuration
+- [SUPABASE_EMAIL_CONFIG.md](./configuration/SUPABASE_EMAIL_CONFIG.md) - Email authentication setup
+- [VERCEL_SETUP.md](./configuration/VERCEL_SETUP.md) - Vercel deployment configuration
+
+### 📁 [research/](./research/)
+Research and planning documents
+- [research.md](./research/research.md) - Market research and competitive analysis
+- [followup.md](./research/followup.md) - Q&A and decision notes
+
+### 📁 [archived/](./archived/)
+Older versions of documents (for reference)
+- Previous versions of development plans and standards
+- Superseded by newer versions in other directories
 
 ## Key Documents
 

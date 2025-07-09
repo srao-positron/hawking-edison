@@ -435,7 +435,7 @@ The answer is always yes.
 
 ## API Key System Architecture
 
-**IMPORTANT**: We have a dual authentication system. Read [API_KEY_ARCHITECTURE.md](API_KEY_ARCHITECTURE.md) for details.
+**IMPORTANT**: We have a dual authentication system. Read [API_KEY_ARCHITECTURE.md](./devdocs/architecture/API_KEY_ARCHITECTURE.md) for details.
 
 Key points:
 1. **We manage all LLM API keys** - users don't need their own
@@ -462,7 +462,7 @@ Key points:
 2. [MASTER_PLAN_V3.md](./devdocs/development/MASTER_PLAN_V3.md) - Overall architecture
 3. [TOOL_DESIGN_PRINCIPLES.md](./devdocs/tools/TOOL_DESIGN_PRINCIPLES.md) - Tool design
 4. [DEVELOPMENT_STANDARDS_V2.md](./devdocs/development/DEVELOPMENT_STANDARDS_V2.md) - Coding standards
-5. [SYSTEM_PROMPTS.md](SYSTEM_PROMPTS.md) - Prompting strategy
+5. [SYSTEM_PROMPTS.md](./devdocs/development/SYSTEM_PROMPTS.md) - Prompting strategy
 
 ### Feature Development Checklist
 
