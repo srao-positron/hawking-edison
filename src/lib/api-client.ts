@@ -1,5 +1,4 @@
 // API Client - Centralized API communication with auth, retries, and rate limiting
-import { createClient } from './supabase-browser'
 
 export interface ApiClientConfig {
   maxRetries?: number
@@ -27,16 +26,28 @@ class ApiClient {
   }
 
   private async getAuthHeaders(): Promise<HeadersInit> {
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
-    
-    if (!session?.access_token) {
-      throw new Error('Not authenticated')
-    }
+    try {
+      // Get session from our API endpoint that handles cross-domain cookies
+      const response = await fetch('/api/auth/session', {
+        credentials: 'include'
+      })
+      
+      if (!response.ok) {
+        throw new Error('Failed to get session')
+      }
+      
+      const { session } = await response.json()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
 
-    return {
-      'Authorization': `Bearer ${session.access_token}`,
-      'Content-Type': 'application/json'
+      return {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      }
+    } catch (error) {
+      throw new Error('Not authenticated')
     }
   }
 
