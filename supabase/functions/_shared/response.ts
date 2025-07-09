@@ -17,7 +17,8 @@ export interface ApiResponse<T = any> {
 
 export function createResponse<T>(
   data?: T,
-  error?: { code: string; message: string }
+  error?: { code: string; message: string },
+  origin?: string | null
 ): Response {
   const response: ApiResponse<T> = {
     success: !error,
@@ -34,7 +35,7 @@ export function createResponse<T>(
     headers: { 
       'Content-Type': 'application/json',
       'X-Request-Id': response.metadata!.requestId,
-      ...corsHeaders
+      ...corsHeaders(origin || undefined)
     },
     status: error ? 400 : 200
   })
@@ -43,7 +44,8 @@ export function createResponse<T>(
 export function createErrorResponse(
   code: string,
   message: string,
-  status: number = 400
+  status: number = 400,
+  origin?: string | null
 ): Response {
   const response: ApiResponse = {
     success: false,
@@ -59,7 +61,7 @@ export function createErrorResponse(
     headers: { 
       'Content-Type': 'application/json',
       'X-Request-Id': response.metadata!.requestId,
-      ...corsHeaders
+      ...corsHeaders(origin || undefined)
     },
     status
   })

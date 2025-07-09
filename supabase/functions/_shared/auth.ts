@@ -32,7 +32,7 @@ function extractApiKey(req: Request): string | null {
 }
 
 // Verify API key authentication
-async function verifyApiKeyAuth(apiKey: string): Promise<{ error: Response | null, user: AuthUser | null }> {
+async function verifyApiKeyAuth(apiKey: string, req: Request): Promise<{ error: Response | null, user: AuthUser | null }> {
   const supabase = createClient(
     Deno.env.get('SUPABASE_URL')!,
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -54,7 +54,7 @@ async function verifyApiKeyAuth(apiKey: string): Promise<{ error: Response | nul
   
   if (error || !apiKeyRecord) {
     return {
-      error: createErrorResponse('AUTH_INVALID', 'Invalid API key', 401),
+      error: createErrorResponse('AUTH_INVALID', 'Invalid API key', 401, req.headers.get("origin")),
       user: null
     }
   }
@@ -62,7 +62,7 @@ async function verifyApiKeyAuth(apiKey: string): Promise<{ error: Response | nul
   // Check if revoked
   if (apiKeyRecord.revoked_at) {
     return {
-      error: createErrorResponse('AUTH_INVALID', 'API key has been revoked', 401),
+      error: createErrorResponse('AUTH_INVALID', 'API key has been revoked', 401, req.headers.get("origin")),
       user: null
     }
   }
@@ -70,7 +70,7 @@ async function verifyApiKeyAuth(apiKey: string): Promise<{ error: Response | nul
   // Check if expired
   if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
     return {
-      error: createErrorResponse('AUTH_INVALID', 'API key has expired', 401),
+      error: createErrorResponse('AUTH_INVALID', 'API key has expired', 401, req.headers.get("origin")),
       user: null
     }
   }
@@ -106,7 +106,7 @@ async function verifySessionAuth(req: Request): Promise<{ error: Response | null
   
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     return {
-      error: createErrorResponse('AUTH_REQUIRED', 'Authorization header required', 401),
+      error: createErrorResponse('AUTH_REQUIRED', 'Authorization header required', 401, req.headers.get("origin")),
       user: null
     }
   }
@@ -127,7 +127,7 @@ async function verifySessionAuth(req: Request): Promise<{ error: Response | null
   
   if (error || !user) {
     return {
-      error: createErrorResponse('AUTH_INVALID', 'Invalid authentication token', 401),
+      error: createErrorResponse('AUTH_INVALID', 'Invalid authentication token', 401, req.headers.get("origin")),
       user: null
     }
   }
@@ -187,7 +187,7 @@ export async function verifyAuth(req: Request): Promise<{ error: Response | null
   // First check for API key
   const apiKey = extractApiKey(req)
   if (apiKey) {
-    return verifyApiKeyAuth(apiKey)
+    return verifyApiKeyAuth(apiKey, req)
   }
   
   // Check for service role auth with X-User-Id
@@ -206,12 +206,12 @@ export async function verifyApiKey(req: Request) {
   
   if (!apiKey) {
     return {
-      error: createErrorResponse('API_KEY_REQUIRED', 'API key required', 401),
+      error: createErrorResponse('API_KEY_REQUIRED', 'API key required', 401, req.headers.get("origin")),
       userId: null
     }
   }
   
-  const result = await verifyApiKeyAuth(apiKey)
+  const result = await verifyApiKeyAuth(apiKey, req)
   return {
     error: result.error,
     userId: result.user?.id || null

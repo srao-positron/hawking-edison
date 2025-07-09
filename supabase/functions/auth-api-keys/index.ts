@@ -27,8 +27,9 @@ Deno.serve(async (req) => {
   })
   
   // Handle CORS
+  const origin = req.headers.get('origin')
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders(origin) })
   }
   
   // Verify authentication
@@ -62,7 +63,7 @@ Deno.serve(async (req) => {
       
       if (error) {
         logger.error('Failed to fetch API keys', error, { requestId, userId: user.id })
-        return createErrorResponse('DATABASE_ERROR', 'Failed to fetch API keys', 500)
+        return createErrorResponse('DATABASE_ERROR', 'Failed to fetch API keys', 500, origin)
       }
       
       const formattedKeys = keys.map(key => ({
@@ -73,14 +74,14 @@ Deno.serve(async (req) => {
       }))
       
       logger.info('API keys fetched', { requestId, count: keys.length })
-      return createResponse({ keys: formattedKeys }, requestId)
+      return createResponse({ keys: formattedKeys }, undefined, origin)
       
     } else if (req.method === 'POST' && action === 'auth-api-keys') {
       // Create new API key
       const body = await req.json() as CreateKeyRequest
       
       if (!body.name || body.name.trim() === '') {
-        return createErrorResponse('VALIDATION_ERROR', 'Name is required', 400)
+        return createErrorResponse('VALIDATION_ERROR', 'Name is required', 400, origin)
       }
       
       // Check existing keys limit
@@ -91,7 +92,7 @@ Deno.serve(async (req) => {
         .is('revoked_at', null)
       
       if (existingKeys && existingKeys.length >= 10) {
-        return createErrorResponse('LIMIT_EXCEEDED', 'Maximum of 10 active API keys allowed', 400)
+        return createErrorResponse('LIMIT_EXCEEDED', 'Maximum of 10 active API keys allowed', 400, origin)
       }
       
       // Generate new API key
@@ -119,11 +120,11 @@ Deno.serve(async (req) => {
       
       if (error) {
         logger.error('Failed to create API key', error, { requestId, userId: user.id })
-        return createErrorResponse('DATABASE_ERROR', 'Failed to create API key', 500)
+        return createErrorResponse('DATABASE_ERROR', 'Failed to create API key', 500, origin)
       }
       
       logger.info('API key created', { requestId, keyId: apiKey.id })
-      return createResponse({ ...apiKey, key }, requestId)
+      return createResponse({ ...apiKey, key }, undefined, origin)
       
     } else if (req.method === 'PATCH' && action !== 'auth-api-keys') {
       // Revoke API key
@@ -131,7 +132,7 @@ Deno.serve(async (req) => {
       const body = await req.json()
       
       if (body.action !== 'revoke') {
-        return createErrorResponse('VALIDATION_ERROR', 'Invalid action', 400)
+        return createErrorResponse('VALIDATION_ERROR', 'Invalid action', 400, origin)
       }
       
       const { error } = await supabase
@@ -142,11 +143,11 @@ Deno.serve(async (req) => {
       
       if (error) {
         logger.error('Failed to revoke API key', error, { requestId, keyId })
-        return createErrorResponse('DATABASE_ERROR', 'Failed to revoke API key', 500)
+        return createErrorResponse('DATABASE_ERROR', 'Failed to revoke API key', 500, origin)
       }
       
       logger.info('API key revoked', { requestId, keyId })
-      return createResponse({ message: 'API key revoked successfully' }, requestId)
+      return createResponse({ message: 'API key revoked successfully' }, undefined, origin)
       
     } else if (req.method === 'DELETE' && action !== 'auth-api-keys') {
       // Delete API key
@@ -160,18 +161,18 @@ Deno.serve(async (req) => {
       
       if (error) {
         logger.error('Failed to delete API key', error, { requestId, keyId })
-        return createErrorResponse('DATABASE_ERROR', 'Failed to delete API key', 500)
+        return createErrorResponse('DATABASE_ERROR', 'Failed to delete API key', 500, origin)
       }
       
       logger.info('API key deleted', { requestId, keyId })
-      return createResponse({ message: 'API key deleted successfully' }, requestId)
+      return createResponse({ message: 'API key deleted successfully' }, undefined, origin)
       
     } else {
-      return createErrorResponse('NOT_FOUND', 'Invalid endpoint', 404)
+      return createErrorResponse('NOT_FOUND', 'Invalid endpoint', 404, origin)
     }
     
   } catch (error) {
     logger.error('Request failed', error as Error, { requestId })
-    return createErrorResponse('INTERNAL_ERROR', 'An error occurred', 500)
+    return createErrorResponse('INTERNAL_ERROR', 'An error occurred', 500, origin)
   }
 })
