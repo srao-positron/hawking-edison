@@ -3,6 +3,9 @@ import { SNSClient, PublishCommand } from '@aws-sdk/client-sns'
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
 import { DynamoDBClient, PutItemCommand, DeleteItemCommand } from '@aws-sdk/client-dynamodb'
 import { createClient } from '@supabase/supabase-js'
+import { callLLMWithTools, LLMMessage } from './llm-client'
+import { getToolDefinitions, executeTool, ToolExecutionContext } from './tools'
+import { verify } from './tools/verification'
 
 const sns = new SNSClient({ region: process.env.AWS_REGION })
 const secretsManager = new SecretsManagerClient({ region: process.env.AWS_REGION })
@@ -35,12 +38,6 @@ interface ToolCall {
   arguments: any
 }
 
-interface Message {
-  role: 'system' | 'user' | 'assistant' | 'tool'
-  content: string | null
-  toolCalls?: ToolCall[]
-  toolCallId?: string
-}
 
 // Get Supabase credentials from Secrets Manager
 async function getSupabaseCredentials(): Promise<{ url: string; serviceRoleKey: string }> {
@@ -190,30 +187,44 @@ async function handleError(supabase: any, sessionId: string, error: any) {
   await removeActiveSession(sessionId)
 }
 
-// Placeholder for LLM calls with tools
-async function callLLMWithTools(messages: Message[]): Promise<{ content?: string; toolCalls?: ToolCall[] }> {
-  // TODO: Implement actual LLM call with function calling
-  // This will use the LLM abstraction from Edge Functions
-  console.log('LLM call with messages:', messages.length)
-  
-  // For now, return a completion to avoid infinite loop
-  return { content: 'Orchestration system is being implemented. Tools coming soon!' }
-}
 
-// Execute tool with timeout handling
+// Execute tool with timeout handling and verification
 async function executeToolWithTimeout(
   toolCall: ToolCall, 
   remainingTime: number,
-  context: { sessionId: string; supabase: any; shouldYield: () => boolean }
+  context: { sessionId: string; supabase: any; shouldYield: () => boolean; userId: string }
 ): Promise<string> {
-  // TODO: Implement actual tool execution
   console.log(`Executing tool ${toolCall.name} with ${remainingTime}ms remaining`)
   
-  // Placeholder result
-  return JSON.stringify({ 
-    status: 'completed',
-    result: `Tool ${toolCall.name} executed successfully` 
-  })
+  try {
+    // Create tool execution context
+    const toolContext: ToolExecutionContext = {
+      supabase: context.supabase,
+      userId: context.userId,
+      sessionId: context.sessionId
+    }
+    
+    // Execute the tool
+    const result = await executeTool(toolCall.name, toolCall.arguments, toolContext)
+    
+    // Verify the tool execution achieved its goal
+    const toolGoal = `Execute ${toolCall.name} with arguments: ${JSON.stringify(toolCall.arguments)}`
+    const verification = await verify(result, toolGoal, 'agent')
+    
+    // Include verification in result
+    return JSON.stringify({
+      status: 'completed',
+      result,
+      verification
+    })
+  } catch (error) {
+    console.error(`Error executing tool ${toolCall.name}:`, error)
+    return JSON.stringify({
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+      tool: toolCall.name
+    })
+  }
 }
 
 export const handler: SQSHandler = async (event: SQSEvent) => {
@@ -263,11 +274,36 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
         const context = {
           sessionId: session.id,
           supabase,
-          shouldYield: () => (Date.now() - startTime) > MAX_EXECUTION_TIME - TIMEOUT_BUFFER
+          shouldYield: () => (Date.now() - startTime) > MAX_EXECUTION_TIME - TIMEOUT_BUFFER,
+          userId: session.user_id
+        }
+        
+        // Get available tools
+        const tools = getToolDefinitions()
+        
+        // Create system message for orchestration
+        const systemMessage: LLMMessage = {
+          role: 'system',
+          content: `You are an orchestrator helping the user with their request.
+          
+          You have access to tools for:
+          - Creating agents with any persona
+          - Running discussions and interactions
+          - Analyzing responses and finding consensus
+          - Managing agent memory
+          
+          Use tools as needed to accomplish the user's goal.
+          Be creative in how you combine tools.
+          Verify your work achieves the intended outcome.`
+        }
+        
+        // Add system message if not present
+        if (!session.messages.find(m => m.role === 'system')) {
+          session.messages.unshift(systemMessage)
         }
         
         // Get next LLM action
-        const response = await callLLMWithTools(session.messages)
+        const response = await callLLMWithTools(session.messages, tools)
         
         if (response.toolCalls && response.toolCalls.length > 0) {
           // Execute tools
@@ -302,8 +338,42 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
             role: 'assistant',
             content: response.content
           })
-          await completeSession(supabase, session, response.content)
-          console.log(`Session ${session.id} completed successfully`)
+          
+          // Verify orchestrator achieved the user's goal
+          const userInput = session.messages.find(m => m.role === 'user')?.content || ''
+          const toolCallsSummary = session.messages
+            .filter(m => m.toolCalls)
+            .map(m => m.toolCalls)
+            .flat()
+          
+          const orchestratorVerification = await verify(
+            {
+              userInput,
+              toolCalls: toolCallsSummary,
+              finalResponse: response.content
+            },
+            `Fulfill user request: ${userInput}`,
+            'orchestrator'
+          )
+          
+          // If verification failed with low confidence, retry
+          if (!orchestratorVerification.goalAchieved && orchestratorVerification.confidence < 0.6) {
+            console.log('Orchestrator verification failed, retrying with feedback')
+            session.messages.push({
+              role: 'system',
+              content: `The previous response did not fully achieve the user's goal. Issues: ${orchestratorVerification.issues?.join(', ')}. Please address these issues.`
+            })
+            continue // Retry the loop
+          }
+          
+          // Include verification in response metadata
+          const finalResponse = {
+            content: response.content,
+            verification: orchestratorVerification
+          }
+          
+          await completeSession(supabase, session, JSON.stringify(finalResponse))
+          console.log(`Session ${session.id} completed successfully with verification`)
           return
         } else {
           // No response from LLM

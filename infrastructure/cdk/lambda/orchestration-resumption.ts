@@ -83,7 +83,7 @@ export const handler: Handler<ResumptionEvent> = async (event) => {
           TopicArn: process.env.ORCHESTRATION_TOPIC_ARN,
           Message: JSON.stringify({
             sessionId: session.id,
-            action: session.id in event.sessionIds ? 'resume' : 'start',
+            action: (event.sessionIds && event.sessionIds.includes(session.id)) ? 'resume' : 'start',
             userId: session.user_id
           })
         })
