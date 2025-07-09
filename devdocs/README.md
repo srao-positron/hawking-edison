@@ -13,6 +13,7 @@ Core system architecture and design documents
 - [API_FIRST_ARCHITECTURE.md](./architecture/API_FIRST_ARCHITECTURE.md) - API-first design principles
 - [ASYNC_ARCHITECTURE.md](./architecture/ASYNC_ARCHITECTURE.md) - Asynchronous processing with AWS
 - [GOAL_VERIFICATION_ARCHITECTURE.md](./architecture/GOAL_VERIFICATION_ARCHITECTURE.md) - Verification system
+- [ORCHESTRATION_ARCHITECTURE.md](./architecture/ORCHESTRATION_ARCHITECTURE.md) - Orchestration system design
 
 ### 📁 [tools/](./tools/)
 Tool design and implementation documentation
@@ -33,6 +34,16 @@ Development guides and standards
 - [DEVELOPMENT_STANDARDS_V2.md](./development/DEVELOPMENT_STANDARDS_V2.md) - Coding standards
 - [DEVELOPMENT_WORKFLOW.md](./development/DEVELOPMENT_WORKFLOW.md) - Development process
 - [MASTER_PLAN_V3.md](./development/MASTER_PLAN_V3.md) - Overall development plan
+- [CLAUDE_CODE_HELPER.md](./development/CLAUDE_CODE_HELPER.md) - Local LLM code generation tool
+- [TESTING_GUIDELINES.md](./development/TESTING_GUIDELINES.md) - Testing best practices
+
+### 📁 [guides/](./guides/)
+User guides and how-tos
+- [API_KEYS_GUIDE.md](./guides/API_KEYS_GUIDE.md) - API key authentication guide
+
+### 📁 [debugging/](./debugging/)
+Debugging and troubleshooting guides
+- [CROSS_BROWSER_AUTH_DEBUG.md](./debugging/CROSS_BROWSER_AUTH_DEBUG.md) - Cross-browser auth debugging
 
 ## Key Documents
 
