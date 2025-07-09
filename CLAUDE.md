@@ -1,6 +1,13 @@
 # Claude Development Reference
 ## Hawking Edison v2 - Tool-Based Architecture
 
+### 📚 Documentation Hub
+All technical documentation has been organized in the [`devdocs/`](./devdocs/) directory:
+- **[Tool Implementation Guide](./devdocs/TOOL_IMPLEMENTATION_GUIDE.md)** - How each tool was built ⭐
+- **[Tool Verification Checklist](./devdocs/TOOL_VERIFICATION_CHECKLIST.md)** - Verification against specs
+- **[Tool System Diagram](./devdocs/TOOL_SYSTEM_DIAGRAM.md)** - Visual architecture
+- **[Tool Usage Examples](./devdocs/TOOL_USAGE_EXAMPLES.md)** - Real code examples
+
 ### Quick Start
 You're building a system where an LLM orchestrates tools to solve any user request. No types, no templates, no workflows - just intelligent tool use.
 
