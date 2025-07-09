@@ -63,10 +63,10 @@ Deno.serve(async (req) => {
     
     // Route based on method and action
     if (req.method === 'GET' && action === 'auth-api-keys') {
-      // List API keys - only select columns that exist in production
+      // List API keys - select actual columns from production
       const { data: keys, error } = await supabase
         .from('api_keys')
-        .select('id, name, created_at, last_used, expires_at')
+        .select('id, name, created_at, last_used, expires_at, is_active, key_prefix')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
       
@@ -77,11 +77,10 @@ Deno.serve(async (req) => {
       
       const formattedKeys = keys.map(key => ({
         ...key,
-        key_prefix: key.name ? `hke_${key.name.substring(0, 4).toLowerCase()}` : 'hke_xxxx', // Generate prefix from name if not in DB
-        revoked_at: null, // Column doesn't exist in production yet
-        isActive: !key.expires_at || new Date(key.expires_at) > new Date(),
+        revoked_at: null, // Using is_active instead
+        isActive: key.is_active && (!key.expires_at || new Date(key.expires_at) > new Date()),
         isExpired: key.expires_at && new Date(key.expires_at) <= new Date(),
-        isRevoked: false // No revoked_at column yet
+        isRevoked: !key.is_active
       }))
       
       logger.info('API keys fetched', { requestId, count: keys.length })
@@ -116,16 +115,15 @@ Deno.serve(async (req) => {
         expiresAt = expiryDate.toISOString()
       }
       
-      // Insert API key - only insert columns we know exist
+      // Insert API key with all required columns
       const insertData: any = {
         user_id: user.id,
         name: body.name,
         key_hash: hash,
+        key_prefix: prefix,
+        is_active: true,
         expires_at: expiresAt
       }
-      
-      // Always include key_prefix for now - will be fixed in migration later
-      insertData.key_prefix = prefix
       
       const { data: apiKey, error } = await supabase
         .from('api_keys')
@@ -150,10 +148,10 @@ Deno.serve(async (req) => {
         return createErrorResponse('VALIDATION_ERROR', 'Invalid action', 400, origin)
       }
       
-      // Since revoked_at doesn't exist, we'll just delete the key
+      // Update is_active to false to revoke the key
       const { error } = await supabase
         .from('api_keys')
-        .delete()
+        .update({ is_active: false })
         .eq('id', keyId)
         .eq('user_id', user.id)
       
