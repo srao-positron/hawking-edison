@@ -9,6 +9,7 @@ All technical documentation has been organized in the [`devdocs/`](./devdocs/) d
 - **[Tool Verification Checklist](./devdocs/TOOL_VERIFICATION_CHECKLIST.md)** - Verification against specs
 - **[Tool System Diagram](./devdocs/TOOL_SYSTEM_DIAGRAM.md)** - Visual architecture
 - **[Tool Usage Examples](./devdocs/TOOL_USAGE_EXAMPLES.md)** - Real code examples
+- **[Realtime Visualization Plan](./devdocs/development/REALTIME_VISUALIZATION_PLAN.md)** - Two-panel UI implementation 🆕
 
 #### Directory Structure
 - **[`devdocs/architecture/`](./devdocs/architecture/)** - Core system architecture
