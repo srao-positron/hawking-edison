@@ -1,4 +1,5 @@
 // Consistent API response format as per API_FIRST_ARCHITECTURE.md
+import { corsHeaders } from './cors.ts'
 
 export interface ApiResponse<T = any> {
   success: boolean
@@ -32,7 +33,8 @@ export function createResponse<T>(
   return new Response(JSON.stringify(response), {
     headers: { 
       'Content-Type': 'application/json',
-      'X-Request-Id': response.metadata!.requestId
+      'X-Request-Id': response.metadata!.requestId,
+      ...corsHeaders
     },
     status: error ? 400 : 200
   })
@@ -56,7 +58,8 @@ export function createErrorResponse(
   return new Response(JSON.stringify(response), {
     headers: { 
       'Content-Type': 'application/json',
-      'X-Request-Id': response.metadata!.requestId
+      'X-Request-Id': response.metadata!.requestId,
+      ...corsHeaders
     },
     status
   })

@@ -142,12 +142,58 @@ async function verifySessionAuth(req: Request): Promise<{ error: Response | null
   }
 }
 
+// Verify service role authentication with X-User-Id
+async function verifyServiceRoleAuth(req: Request): Promise<{ error: Response | null, user: AuthUser | null }> {
+  const authHeader = req.headers.get('Authorization')
+  const userId = req.headers.get('X-User-Id')
+  
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return { error: null, user: null }
+  }
+  
+  const token = authHeader.replace('Bearer ', '')
+  
+  // Check if this is the service role key
+  if (token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') && userId) {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL')!,
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    )
+    
+    // Get user details
+    const { data: userData } = await supabase
+      .from('auth.users')
+      .select('email')
+      .eq('id', userId)
+      .single()
+    
+    if (userData) {
+      return {
+        error: null,
+        user: {
+          id: userId,
+          email: userData.email,
+          authMethod: 'session'
+        }
+      }
+    }
+  }
+  
+  return { error: null, user: null }
+}
+
 // Unified authentication function
 export async function verifyAuth(req: Request): Promise<{ error: Response | null, user: AuthUser | null }> {
   // First check for API key
   const apiKey = extractApiKey(req)
   if (apiKey) {
     return verifyApiKeyAuth(apiKey)
+  }
+  
+  // Check for service role auth with X-User-Id
+  const serviceRoleResult = await verifyServiceRoleAuth(req)
+  if (serviceRoleResult.user) {
+    return serviceRoleResult
   }
   
   // Fall back to session auth
