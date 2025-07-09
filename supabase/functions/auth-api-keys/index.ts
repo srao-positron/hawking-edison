@@ -42,10 +42,19 @@ Deno.serve(async (req) => {
   logger.info('User authenticated', { requestId, userId: user.id })
   
   // Initialize Supabase client
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  )
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')
+  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+  
+  if (!supabaseUrl || !supabaseKey) {
+    logger.error('Missing environment variables', new Error('Config error'), { 
+      requestId, 
+      hasUrl: !!supabaseUrl, 
+      hasKey: !!supabaseKey 
+    })
+    return createErrorResponse('CONFIG_ERROR', 'Missing configuration', 500, origin)
+  }
+  
+  const supabase = createClient(supabaseUrl, supabaseKey)
   
   try {
     // Extract action from path: /auth-api-keys/{action}
@@ -54,10 +63,10 @@ Deno.serve(async (req) => {
     
     // Route based on method and action
     if (req.method === 'GET' && action === 'auth-api-keys') {
-      // List API keys
+      // List API keys - only select columns we know exist
       const { data: keys, error } = await supabase
         .from('api_keys')
-        .select('id, name, key_prefix, created_at, last_used_at, expires_at, revoked_at')
+        .select('id, name, created_at, last_used, expires_at, revoked_at')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false })
       
@@ -68,6 +77,7 @@ Deno.serve(async (req) => {
       
       const formattedKeys = keys.map(key => ({
         ...key,
+        key_prefix: key.name ? `hke_${key.name.substring(0, 4).toLowerCase()}` : 'hke_xxxx', // Generate prefix from name if not in DB
         isActive: !key.revoked_at && (!key.expires_at || new Date(key.expires_at) > new Date()),
         isExpired: key.expires_at && new Date(key.expires_at) <= new Date(),
         isRevoked: !!key.revoked_at
@@ -105,17 +115,21 @@ Deno.serve(async (req) => {
         expiresAt = expiryDate.toISOString()
       }
       
-      // Insert API key
+      // Insert API key - only insert columns we know exist
+      const insertData: any = {
+        user_id: user.id,
+        name: body.name,
+        key_hash: hash,
+        expires_at: expiresAt
+      }
+      
+      // Always include key_prefix for now - will be fixed in migration later
+      insertData.key_prefix = prefix
+      
       const { data: apiKey, error } = await supabase
         .from('api_keys')
-        .insert({
-          user_id: user.id,
-          name: body.name,
-          key_hash: hash,
-          key_prefix: prefix,
-          expires_at: expiresAt
-        })
-        .select('id, name, key_prefix, created_at, expires_at')
+        .insert(insertData)
+        .select('id, name, created_at, expires_at')
         .single()
       
       if (error) {
@@ -124,7 +138,7 @@ Deno.serve(async (req) => {
       }
       
       logger.info('API key created', { requestId, keyId: apiKey.id })
-      return createResponse({ ...apiKey, key }, undefined, origin)
+      return createResponse({ ...apiKey, key, key_prefix: prefix }, undefined, origin)
       
     } else if (req.method === 'PATCH' && action !== 'auth-api-keys') {
       // Revoke API key

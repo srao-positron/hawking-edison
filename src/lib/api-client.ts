@@ -281,29 +281,49 @@ export const api = {
   // API Key endpoints - Call Edge Functions directly
   apiKeys: {
     list: async () => {
+      console.log('[API Keys] Listing API keys...')
       const supabase = getBrowserClient()
       const { data: { session } } = await supabase.auth.getSession()
       
+      console.log('[API Keys] Session found:', !!session)
       if (!session?.access_token) {
         throw new Error('Not authenticated')
       }
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
+      console.log('[API Keys] Edge Function URL:', url)
+      console.log('[API Keys] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
+
+      const response = await fetch(url, {
         method: 'GET',
         credentials: 'include',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Origin': window.location.origin
         }
       })
       
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error?.message || 'Failed to fetch API keys')
+      console.log('[API Keys] Response status:', response.status)
+      console.log('[API Keys] Response headers:', Object.fromEntries(response.headers.entries()))
+      
+      const responseText = await response.text()
+      console.log('[API Keys] Response text:', responseText)
+      
+      let responseData
+      try {
+        responseData = JSON.parse(responseText)
+      } catch (e) {
+        console.error('[API Keys] Failed to parse response:', e)
+        throw new Error('Invalid response from server')
       }
       
-      const result = await response.json()
-      return result.data
+      if (!response.ok) {
+        console.error('[API Keys] Error response:', responseData)
+        throw new Error(responseData.error?.message || `Failed to fetch API keys: ${response.status}`)
+      }
+      
+      return responseData.data
     },
     
     create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {

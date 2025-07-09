@@ -78,21 +78,16 @@ async function verifyApiKeyAuth(apiKey: string, req: Request): Promise<{ error: 
   // Update last used timestamp
   await supabase
     .from('api_keys')
-    .update({ last_used_at: new Date().toISOString() })
+    .update({ last_used: new Date().toISOString() })
     .eq('id', apiKeyRecord.id)
   
-  // Get user email
-  const { data: userData } = await supabase
-    .from('auth.users')
-    .select('email')
-    .eq('id', apiKeyRecord.user_id)
-    .single()
-  
+  // Note: Edge Functions can't access auth.users directly
+  // Return user without email
   return {
     error: null,
     user: {
       id: apiKeyRecord.user_id,
-      email: userData?.email,
+      email: undefined,
       authMethod: 'api-key',
       apiKeyId: apiKeyRecord.id,
       apiKeyName: apiKeyRecord.name
@@ -160,21 +155,14 @@ async function verifyServiceRoleAuth(req: Request): Promise<{ error: Response | 
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
     
-    // Get user details
-    const { data: userData } = await supabase
-      .from('auth.users')
-      .select('email')
-      .eq('id', userId)
-      .single()
-    
-    if (userData) {
-      return {
-        error: null,
-        user: {
-          id: userId,
-          email: userData.email,
-          authMethod: 'session'
-        }
+    // Note: Edge Functions can't access auth.users directly
+    // Return user without email for service role auth
+    return {
+      error: null,
+      user: {
+        id: userId,
+        email: undefined,
+        authMethod: 'session'
       }
     }
   }
