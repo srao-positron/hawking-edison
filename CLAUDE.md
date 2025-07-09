@@ -3,10 +3,24 @@
 
 ### 📚 Documentation Hub
 All technical documentation has been organized in the [`devdocs/`](./devdocs/) directory:
+
+#### Main Guides
 - **[Tool Implementation Guide](./devdocs/TOOL_IMPLEMENTATION_GUIDE.md)** - How each tool was built ⭐
 - **[Tool Verification Checklist](./devdocs/TOOL_VERIFICATION_CHECKLIST.md)** - Verification against specs
 - **[Tool System Diagram](./devdocs/TOOL_SYSTEM_DIAGRAM.md)** - Visual architecture
 - **[Tool Usage Examples](./devdocs/TOOL_USAGE_EXAMPLES.md)** - Real code examples
+
+#### Directory Structure
+- **[`devdocs/architecture/`](./devdocs/architecture/)** - Core system architecture
+  - Complete architecture, API-first design, async processing, memory system
+- **[`devdocs/tools/`](./devdocs/tools/)** - Tool specifications and design
+  - Tool specs, design principles, parameterization guides
+- **[`devdocs/demos/`](./devdocs/demos/)** - Demo specifications
+  - Code review, business decisions, message testing examples
+- **[`devdocs/development/`](./devdocs/development/)** - Development guides
+  - **IMPORTANT**: [DEVELOPMENT_RULES.md](./devdocs/development/DEVELOPMENT_RULES.md) - Read this first!
+
+**Quick Access**: The [devdocs README](./devdocs/README.md) provides a complete index of all documentation.
 
 ### Quick Start
 You're building a system where an LLM orchestrates tools to solve any user request. No types, no templates, no workflows - just intelligent tool use.
@@ -444,10 +458,10 @@ Key points:
 ### Before Building Any Feature
 
 **Must Read These Documents**:
-1. [API_FIRST_ARCHITECTURE.md](API_FIRST_ARCHITECTURE.md) - API-first design
-2. [MASTER_PLAN_V3.md](MASTER_PLAN_V3.md) - Overall architecture
-3. [TOOL_DESIGN_PRINCIPLES.md](TOOL_DESIGN_PRINCIPLES.md) - Tool design
-4. [DEVELOPMENT_STANDARDS_V2.md](DEVELOPMENT_STANDARDS_V2.md) - Coding standards
+1. [API_FIRST_ARCHITECTURE.md](./devdocs/architecture/API_FIRST_ARCHITECTURE.md) - API-first design
+2. [MASTER_PLAN_V3.md](./devdocs/development/MASTER_PLAN_V3.md) - Overall architecture
+3. [TOOL_DESIGN_PRINCIPLES.md](./devdocs/tools/TOOL_DESIGN_PRINCIPLES.md) - Tool design
+4. [DEVELOPMENT_STANDARDS_V2.md](./devdocs/development/DEVELOPMENT_STANDARDS_V2.md) - Coding standards
 5. [SYSTEM_PROMPTS.md](SYSTEM_PROMPTS.md) - Prompting strategy
 
 ### Feature Development Checklist
@@ -526,7 +540,7 @@ We need to discuss alternatives that maintain our architecture principles.
 
 ## 🔴 MANDATORY: Read DEVELOPMENT_RULES.md
 
-**[DEVELOPMENT_RULES.md](DEVELOPMENT_RULES.md)** contains the immutable rules that apply to EVERY Claude session. These rules are:
+**[DEVELOPMENT_RULES.md](./devdocs/development/DEVELOPMENT_RULES.md)** contains the immutable rules that apply to EVERY Claude session. These rules are:
 - Non-negotiable
 - Apply even after context resets
 - Must be followed whenever working in this directory
@@ -541,7 +555,7 @@ Key rules include:
 7. Create helper scripts
 8. No types or templates
 
-**If you haven't read DEVELOPMENT_RULES.md yet, READ IT NOW.**
+**If you haven't read [DEVELOPMENT_RULES.md](./devdocs/development/DEVELOPMENT_RULES.md) yet, READ IT NOW.**
 
 ### Test User for Automated Testing
 
