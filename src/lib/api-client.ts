@@ -281,29 +281,78 @@ export const api = {
   // API Key endpoints - Use local proxy to avoid cross-domain issues
   apiKeys: {
     list: async () => {
-      const response = await apiClient.get<{ data: { keys: any[] } }>('/api/api-keys')
-      return response.data
+      // Bypass the apiClient to avoid auth check in browser
+      const response = await fetch('/api/api-keys', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to fetch API keys')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {
-      const response = await apiClient.post<{ data: any }>(
-        '/api/api-keys',
-        { name, expiresInDays, environment }
-      )
-      return response.data
+      const response = await fetch('/api/api-keys', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name, expiresInDays, environment })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to create API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     revoke: async (id: string) => {
-      const response = await apiClient.patch<{ data: any }>(
-        `/api/api-keys/${id}`,
-        { action: 'revoke' }
-      )
-      return response.data
+      const response = await fetch(`/api/api-keys/${id}`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'revoke' })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to revoke API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     delete: async (id: string) => {
-      const response = await apiClient.delete<{ data: any }>(`/api/api-keys/${id}`)
-      return response.data
+      const response = await fetch(`/api/api-keys/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.error?.message || 'Failed to delete API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     }
   }
 }
