@@ -4,18 +4,17 @@ import { useState, useEffect } from 'react'
 import { api } from '@/lib/api-client'
 import { format } from 'date-fns'
 import { Copy, Key, Trash2, Ban, Plus } from 'lucide-react'
+import { Database } from '@/types/database.types'
 
-interface ApiKey {
-  id: string
-  name: string
-  key_prefix: string
-  created_at: string
-  last_used: string | null
-  expires_at: string | null
-  revoked_at: string | null
+// Use the generated type from the database
+type ApiKeyRow = Database['public']['Tables']['api_keys']['Row']
+
+// Extend with computed fields from the Edge Function
+interface ApiKey extends ApiKeyRow {
   isActive: boolean
   isExpired: boolean
   isRevoked: boolean
+  revoked_at: string | null // Added by Edge Function for compatibility
 }
 
 export default function ApiKeyManager() {
@@ -273,9 +272,9 @@ export default function ApiKeyManager() {
                     <code>{key.key_prefix}...</code>
                   </p>
                   <div className="text-xs text-gray-500 space-y-1">
-                    <p>Created: {format(new Date(key.created_at), 'PPpp')}</p>
-                    {key.last_used_at && (
-                      <p>Last used: {format(new Date(key.last_used_at), 'PPpp')}</p>
+                    <p>Created: {key.created_at && format(new Date(key.created_at), 'PPpp')}</p>
+                    {key.last_used && (
+                      <p>Last used: {format(new Date(key.last_used), 'PPpp')}</p>
                     )}
                     {key.expires_at && (
                       <p>Expires: {format(new Date(key.expires_at), 'PPpp')}</p>

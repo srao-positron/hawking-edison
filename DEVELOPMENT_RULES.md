@@ -701,3 +701,48 @@ async function loginAsTestUser(page: Page) {
 6. Repeat until GREEN
 
 **Remember: "It works on my machine" doesn't count!**
+
+---
+
+## Rule 25: Database Type Synchronization MANDATORY
+
+**ALWAYS sync TypeScript types after ANY database schema change:**
+
+```bash
+# After ANY database change (migrations, manual edits, column changes):
+npx tsx utils/sync-database-types.ts
+
+# This command:
+1. Generates types from actual database schema
+2. Updates src/types/database.types.ts
+3. Checks for TypeScript errors
+4. Shows what changed
+
+# When to run:
+- After creating new tables
+- After adding/removing columns
+- After changing column types
+- After running migrations
+- BEFORE committing schema changes
+```
+
+**Use generated types in your code:**
+```typescript
+// ❌ WRONG - Manual interface
+interface ApiKey {
+  id: string
+  last_used_at: string  // Wrong column name!
+}
+
+// ✅ CORRECT - Use generated types
+import { Database } from '@/types/database.types'
+type ApiKey = Database['public']['Tables']['api_keys']['Row']
+```
+
+**This prevents:**
+- Runtime errors from mismatched column names
+- Type errors from wrong data types
+- Failed deployments from schema mismatches
+- Hours of debugging Edge Function failures
+
+**CRITICAL: If you change the database schema without syncing types, Edge Functions WILL fail in production!**

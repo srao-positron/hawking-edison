@@ -262,6 +262,38 @@ Can LLM figure this out with existing tools?
     └─ No → Add a simple tool (not a feature!)
 ```
 
+## 🔴 CRITICAL: Database Type Synchronization
+
+**After ANY database schema change, you MUST:**
+
+```bash
+# Sync TypeScript types with database
+npx tsx utils/sync-database-types.ts
+```
+
+This tool:
+- Generates types from the actual Supabase database
+- Updates `src/types/database.types.ts`
+- Prevents runtime errors from schema mismatches
+- Shows what columns changed
+
+**When to run:**
+- After creating/modifying tables
+- After adding/removing columns
+- After running migrations
+- BEFORE testing Edge Functions
+- BEFORE committing changes
+
+**Example workflow:**
+```bash
+# 1. Make database change (e.g., add column)
+# 2. Sync types
+npx tsx utils/sync-database-types.ts
+# 3. Update code to use new types
+# 4. Test Edge Functions
+# 5. Commit both schema and type changes
+```
+
 ### Claude Code Helper - Use CodeLlama for Code Generation!
 
 **IMPORTANT**: Use the Claude Code Helper for routine coding tasks:

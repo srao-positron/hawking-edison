@@ -21,6 +21,7 @@
     "supabase:functions:deploy": "supabase functions deploy",
     "db:reset": "supabase db reset",
     "db:types": "supabase gen types typescript --local > src/lib/database.types.ts",
+    "db:sync-types": "tsx utils/sync-database-types.ts",
     "db:push": "supabase db push",
     "env:check": "tsx utils/check-env.ts",
     "setup": "npm run env:check && npm run supabase:start && npm run db:types",
