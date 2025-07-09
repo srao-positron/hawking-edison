@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAuth } from '@/lib/auth-unified'
 import { generateApiKey } from '@/lib/api-key-utils'
 import { createClient } from '@/lib/supabase-server'
-import { createAdminClient } from '@/lib/supabase-admin'
 import { cookies } from 'next/headers'
 import { z } from 'zod'
 
@@ -15,11 +14,8 @@ const createKeySchema = z.object({
 export async function GET(request: NextRequest) {
   try {
     const user = await requireAuth(request)
-    
-    console.log('[API Keys] User authenticated:', { userId: user.id, authMethod: user.authMethod })
-    
-    // Use admin client with user context to avoid cookie issues
-    const supabase = createAdminClient()
+    const cookieStore = await cookies()
+    const supabase = createClient(cookieStore)
     
     const { data: keys, error } = await supabase
       .from('api_keys')
@@ -53,8 +49,6 @@ export async function GET(request: NextRequest) {
       )
     }
     
-    console.error('[API Keys] Error in GET:', error)
-    
     return NextResponse.json(
       { success: false, error: { code: 'INTERNAL_ERROR', message: 'An error occurred' } },
       { status: 500 }
@@ -68,8 +62,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const validated = createKeySchema.parse(body)
     
-    // Use admin client with user context to avoid cookie issues
-    const supabase = createAdminClient()
+    const cookieStore = await cookies()
+    const supabase = createClient(cookieStore)
     
     const { data: existingKeys } = await supabase
       .from('api_keys')
