@@ -73,13 +73,15 @@ export const handler: CloudFormationCustomResourceHandler = async (event, contex
       const secretData = JSON.parse(secretResponse.SecretString || '{}')
       const SecretAccessKey = secretData.secretAccessKey
       
-      // Call Edge Function to store credentials
-      console.log('Calling Edge Function to store AWS credentials in Vault...')
+      // Call Vercel API to store credentials (which proxies to Supabase)
+      console.log('Calling Vercel API to store AWS credentials in Vault...')
       
-      const edgeFunctionUrl = `${SupabaseUrl}/functions/v1/vault-store`
+      // Use the Vercel app URL - in production this would be your custom domain
+      const vercelUrl = process.env.VERCEL_URL || 'https://hawking-edison.vercel.app'
+      const vaultStoreUrl = `${vercelUrl}/api/vault-store`
       const vaultStoreServiceKey = process.env.VAULT_STORE_SERVICE_KEY || SupabaseServiceRoleKey
       
-      const response = await fetch(edgeFunctionUrl, {
+      const response = await fetch(vaultStoreUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

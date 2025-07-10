@@ -147,6 +147,7 @@ export class HawkingEdisonStack extends cdk.Stack {
     vaultCredentialManager.addEnvironment('SUPABASE_URL', process.env.SUPABASE_URL || 'PLACEHOLDER')
     vaultCredentialManager.addEnvironment('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER')
     vaultCredentialManager.addEnvironment('VAULT_STORE_SERVICE_KEY', process.env.VAULT_STORE_SERVICE_KEY || 'PLACEHOLDER')
+    vaultCredentialManager.addEnvironment('VERCEL_URL', process.env.VERCEL_URL || 'https://hawking-edison.vercel.app')
     
     // Grant permission to retrieve the secret
     edgeFunctionCredsSecret.grantRead(vaultCredentialManager)

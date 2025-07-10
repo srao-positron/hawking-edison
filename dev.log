@@ -51,3 +51,8 @@
    Reload env: .env.local
  ✓ Compiled in 506ms (3494 modules)
  GET /chat 200 in 55ms
+ ✓ Compiled in 181ms (1387 modules)
+ ✓ Compiled in 443ms (3494 modules)
+ GET /chat 200 in 252ms
+ GET /chat 200 in 8ms
+ GET /chat 200 in 10ms

@@ -32,7 +32,6 @@ async function testVaultStore() {
       headers: {
         'Content-Type': 'application/json',
         'x-service-key': serviceKey,
-        'Authorization': `Bearer ${process.env.SUPABASE_SERVICE_ROLE_KEY}`,
       },
       body: JSON.stringify(testData),
     })

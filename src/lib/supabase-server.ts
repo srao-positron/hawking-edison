@@ -3,10 +3,14 @@ import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { type ReadonlyRequestCookies } from 'next/dist/server/web/spec-extension/adapters/request-cookies'
 import { Database } from './database.types'
 
-export function createClient(cookieStore: ReadonlyRequestCookies) {
+export function createClient(cookieStore: ReadonlyRequestCookies, options?: { serviceRole?: boolean }) {
+  const key = options?.serviceRole 
+    ? process.env.SUPABASE_SERVICE_ROLE_KEY!
+    : process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    
   return createServerClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    key,
     {
       cookies: {
         getAll() {
