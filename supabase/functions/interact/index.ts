@@ -250,23 +250,38 @@ Deno.serve(async (req) => {
       return createErrorResponse('DB_ERROR', 'Failed to save message')
     }
     
-    // Check if this request should use orchestration
-    const useOrchestration = mode === 'async' || shouldUseOrchestration(input)
+    // ALWAYS use orchestration for LLM requests to avoid Edge Function timeouts
+    const useOrchestration = true
     
     if (useOrchestration) {
+      // Prepare messages with token counts for context management
+      const allMessages = [
+        ...messages,
+        { role: 'user' as const, content: input }
+      ]
+      
+      // Add token counts to messages (rough estimate for Edge Function)
+      const messagesWithTokens = allMessages.map(msg => ({
+        ...msg,
+        tokens: Math.ceil(msg.content.length / 4) // Rough estimate
+      }))
+      
+      // Check if we're approaching context limits
+      const totalTokens = messagesWithTokens.reduce((sum, msg) => sum + (msg.tokens || 0), 0)
+      const needsCompression = totalTokens > 80000 // 80% of Claude's 100k limit
+      
       // Create orchestration session
       const { data: session, error: sessionError } = await supabase
         .from('orchestration_sessions')
         .insert({
           user_id: user!.id,
           status: 'pending',
-          messages: [
-            ...messages,
-            { role: 'user', content: input }
-          ],
+          messages: messagesWithTokens,
           metadata: {
             thread_id: threadId,
-            provider: provider || 'claude-3-opus'
+            provider: provider || 'claude-3-opus',
+            needs_compression: needsCompression,
+            total_tokens: totalTokens
           }
         })
         .select()
@@ -286,121 +301,26 @@ Deno.serve(async (req) => {
       })
       
       if (!published) {
-        // Fallback to synchronous processing if SNS publish fails
-        logger.warn('Failed to publish to SNS, falling back to sync processing')
-      } else {
-        // Return immediately with session ID for async processing
-        return createResponse({
-          sessionId: session.id,
-          threadId: threadId,
-          status: 'processing',
-          message: 'Your request is being processed. You can check the status using the session ID.',
-          async: true
-        })
+        // SNS publish failed - return error
+        logger.error('Failed to publish to SNS for async processing')
+        return createErrorResponse('SERVICE_ERROR', 'Failed to initiate processing. Please try again.')
       }
+      
+      // Return immediately with session ID for async processing
+      return createResponse({
+        sessionId: session.id,
+        threadId: threadId,
+        threadTitle: isNewThread ? threadTitle : undefined,
+        isNewThread: isNewThread,
+        status: 'processing',
+        message: 'Processing your request...',
+        async: true
+      })
     }
 
-    // Record interaction start for synchronous processing
-    const { data: interaction, error: dbError } = await supabase
-      .from('interactions')
-      .insert({
-        user_id: user!.id,
-        input,
-        tool_calls: [],
-        result: {},
-        metadata: { thread_id: threadId }
-      })
-      .select()
-      .single()
-
-    if (dbError) {
-      logger.error('Failed to create interaction', dbError)
-      return createErrorResponse('DB_ERROR', 'Failed to record interaction')
-    }
-
-    // Prepare system prompt
-    const systemPrompt = `You are an intelligent orchestrator with access to various tools.
-Your job is to understand the user's request and use the appropriate tools to fulfill it.
-
-Your responses support Markdown formatting, including:
-- **Bold** and *italic* text
-- Code blocks with syntax highlighting
-- Lists (ordered and unordered)
-- Headers (# ## ###)
-- Links [text](url)
-- Tables
-- Blockquotes
-
-Feel free to use Markdown to format your responses for better readability.
-
-Available tools:
-${Object.entries(tools).map(([name, tool]) => 
-  `- ${name}: ${(tool as any).description || 'No description'}`
-).join('\n')}
-
-Always think step by step about how to best accomplish the user's goal.
-Be creative in how you combine tools to solve problems.`
-
-    // Call LLM with thread context
-    const llmMessages = [
-      { role: 'system' as const, content: systemPrompt },
-      ...messages, // Previous messages in thread
-      { role: 'user' as const, content: input }
-    ]
-
-    const startTime = Date.now()
-    const llmResponse = await llm.complete(llmMessages, { provider })
-    const duration = Date.now() - startTime
-
-    logger.info('LLM response received', {
-      requestId,
-      userId: user!.id,
-      duration,
-      tokens: llmResponse.usage?.totalTokens
-    })
-
-    // Save assistant message to thread
-    const { error: assistantMsgError } = await supabase
-      .from('chat_messages')
-      .insert({
-        thread_id: threadId,
-        user_id: user!.id,
-        role: 'assistant',
-        content: llmResponse.content,
-        tokens_used: llmResponse.usage?.totalTokens,
-        model: provider || 'claude-3-opus'
-      })
-    
-    if (assistantMsgError) {
-      logger.error('Failed to save assistant message', assistantMsgError)
-    }
-    
-    // Update thread's updated_at timestamp
-    await supabase
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId)
-    
-    // Update interaction with result
-    await supabase
-      .from('interactions')
-      .update({
-        result: {
-          response: llmResponse.content,
-          duration,
-          tokens: llmResponse.usage
-        }
-      })
-      .eq('id', interaction.id)
-
-    return createResponse({
-      interactionId: interaction.id,
-      threadId: threadId,
-      threadTitle: isNewThread ? threadTitle : undefined,
-      isNewThread: isNewThread,
-      response: llmResponse.content,
-      usage: llmResponse.usage
-    })
+    // This code path should never be reached since we always use orchestration
+    logger.error('Unexpected code path - synchronous processing attempted')
+    return createErrorResponse('INTERNAL_ERROR', 'System configuration error')
 
   } catch (error) {
     logger.error('Request failed', error as Error, { requestId })

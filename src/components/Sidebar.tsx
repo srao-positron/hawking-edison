@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, MessageSquare, Trash2 } from 'lucide-react'
+import { ChevronDown, MessageSquare, Trash2, Edit2 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -26,6 +26,8 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [editingThreadId, setEditingThreadId] = useState<string | null>(null)
+  const [editingTitle, setEditingTitle] = useState('')
   const { user } = useAuth()
 
   useEffect(() => {
@@ -91,6 +93,29 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
     }
   }
 
+  const startEditingThread = (threadId: string, currentTitle: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingThreadId(threadId)
+    setEditingTitle(currentTitle || 'Untitled conversation')
+  }
+
+  const handleRenameThread = async (threadId: string) => {
+    if (!editingTitle.trim()) {
+      setEditingThreadId(null)
+      return
+    }
+
+    try {
+      await api.threads.update(threadId, { title: editingTitle.trim() })
+      setThreads(threads.map(t => 
+        t.id === threadId ? { ...t, title: editingTitle.trim() } : t
+      ))
+      setEditingThreadId(null)
+    } catch (error) {
+      console.error('Failed to rename thread:', error)
+    }
+  }
+
   return (
     <div className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ${
       collapsed ? 'w-16' : 'w-64'
@@ -126,26 +151,60 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
                       currentSessionId === thread.id ? 'bg-blue-100 border-2 border-blue-500 shadow-sm' : 'border-2 border-transparent'
                     }`}
                   >
-                    <button
-                      onClick={() => onSelectChat?.(thread.id)}
-                      className="flex-1 text-left min-w-0 flex items-center"
-                    >
-                      <div className="flex-1 min-w-0">
-                        <div className="font-medium truncate">
-                          {thread.title || 'Untitled conversation'}
+                    {editingThreadId === thread.id ? (
+                      <form
+                        onSubmit={(e) => {
+                          e.preventDefault()
+                          handleRenameThread(thread.id)
+                        }}
+                        className="flex-1 flex items-center gap-2"
+                      >
+                        <input
+                          type="text"
+                          value={editingTitle}
+                          onChange={(e) => setEditingTitle(e.target.value)}
+                          onBlur={() => handleRenameThread(thread.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Escape') {
+                              setEditingThreadId(null)
+                            }
+                          }}
+                          className="flex-1 px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          autoFocus
+                        />
+                      </form>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => onSelectChat?.(thread.id)}
+                          className="flex-1 text-left min-w-0 flex items-center"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">
+                              {thread.title || 'Untitled conversation'}
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5">
+                              {new Date(thread.updated_at).toLocaleDateString()}
+                              {thread.message_count > 0 && ` • ${thread.message_count} messages`}
+                            </div>
+                          </div>
+                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => startEditingThread(thread.id, thread.title || '', e)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-gray-200 rounded transition-all flex-shrink-0"
+                          >
+                            <Edit2 className="w-3.5 h-3.5 text-gray-500" />
+                          </button>
+                          <button
+                            onClick={(e) => handleDeleteThread(thread.id, e)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 rounded transition-all flex-shrink-0"
+                          >
+                            <Trash2 className="w-4 h-4 text-red-500" />
+                          </button>
                         </div>
-                        <div className="text-xs text-gray-500 mt-0.5">
-                          {new Date(thread.updated_at).toLocaleDateString()}
-                          {thread.message_count > 0 && ` • ${thread.message_count} messages`}
-                        </div>
-                      </div>
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteThread(thread.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 rounded transition-all flex-shrink-0"
-                    >
-                      <Trash2 className="w-4 h-4 text-red-500" />
-                    </button>
+                      </>
+                    )}
                   </div>
                 ))
               )}

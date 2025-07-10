@@ -169,6 +169,13 @@ export const apiClient = new ApiClient()
 
 // Export specific API methods
 export const api = {
+  // Get current session for auth
+  getSession: async () => {
+    const supabase = getBrowserClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    return session
+  },
+  
   // Interact endpoint - Use direct fetch like chat-threads
   interact: async (input: string, options?: { provider?: string; sessionId?: string }) => {
     const supabase = getBrowserClient()
@@ -198,7 +205,7 @@ export const api = {
         input,
         provider: options?.provider,
         context: options?.sessionId ? { sessionId: options.sessionId } : undefined,
-        mode: 'sync'
+        mode: 'async' // Always use async to avoid Edge Function timeouts
       })
     })
     

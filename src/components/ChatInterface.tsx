@@ -112,15 +112,98 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         onThreadCreated(response.threadId)
       }
       
-      const assistantMessage: Message = {
-        id: response.interactionId || crypto.randomUUID(),
-        role: 'assistant',
-        content: response.response || 'No response received',
-        timestamp: new Date(),
-        tokens: response.usage?.totalTokens
+      // Check if this is an async response
+      if (response.async && response.sessionId) {
+        // Create a placeholder message with thinking indicator
+        const thinkingMessage: Message = {
+          id: response.sessionId,
+          role: 'assistant',
+          content: '🤔 Thinking...',
+          timestamp: new Date(),
+          error: false
+        }
+        setMessages(prev => [...prev, thinkingMessage])
+        
+        // Connect to SSE stream for real-time updates
+        const eventSource = new EventSource(
+          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/stream?sessionId=${response.sessionId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${(await api.getSession())?.access_token}`
+            }
+          } as any
+        )
+        
+        eventSource.onmessage = (event) => {
+          const data = JSON.parse(event.data)
+          
+          if (data.type === 'status') {
+            // Update thinking message with progress
+            setMessages(prev => prev.map(msg => 
+              msg.id === response.sessionId
+                ? { ...msg, content: `🤔 ${data.status === 'processing' ? 'Thinking' : 'Processing'}...${data.progress ? ` (${data.progress}%)` : ''}` }
+                : msg
+            ))
+          } else if (data.type === 'result') {
+            // Replace thinking message with actual response
+            setMessages(prev => prev.map(msg => 
+              msg.id === response.sessionId
+                ? { 
+                    ...msg, 
+                    content: data.content,
+                    tokens: data.usage?.totalTokens,
+                    timestamp: new Date()
+                  }
+                : msg
+            ))
+            eventSource.close()
+            setIsLoading(false)
+          } else if (data.type === 'error') {
+            // Replace thinking message with error
+            setMessages(prev => prev.map(msg => 
+              msg.id === response.sessionId
+                ? { 
+                    ...msg, 
+                    content: 'I apologize, but I encountered an error processing your request. Please try again.',
+                    error: true,
+                    timestamp: new Date()
+                  }
+                : msg
+            ))
+            eventSource.close()
+            setIsLoading(false)
+          }
+        }
+        
+        eventSource.onerror = (error) => {
+          console.error('SSE error:', error)
+          eventSource.close()
+          
+          // Update message to show error
+          setMessages(prev => prev.map(msg => 
+            msg.id === response.sessionId
+              ? { 
+                  ...msg, 
+                  content: 'Connection lost. Please try again.',
+                  error: true,
+                  timestamp: new Date()
+                }
+              : msg
+          ))
+          setIsLoading(false)
+        }
+      } else {
+        // Sync response (shouldn't happen anymore)
+        const assistantMessage: Message = {
+          id: response.interactionId || crypto.randomUUID(),
+          role: 'assistant',
+          content: response.response || 'No response received',
+          timestamp: new Date(),
+          tokens: response.usage?.totalTokens
+        }
+        setMessages(prev => [...prev, assistantMessage])
+        setIsLoading(false)
       }
-
-      setMessages(prev => [...prev, assistantMessage])
     } catch (error) {
       console.error('Chat error:', error) // Debug log
       
@@ -132,7 +215,6 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         error: true
       }
       setMessages(prev => [...prev, errorMessage])
-    } finally {
       setIsLoading(false)
     }
   }
