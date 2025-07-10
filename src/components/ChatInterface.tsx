@@ -26,11 +26,41 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Reset messages when sessionId changes
+  // Keep track of whether we just created a thread
+  const [justCreatedThread, setJustCreatedThread] = useState(false)
+  
+  // Load messages when sessionId changes (unless we just created the thread)
   useEffect(() => {
-    setMessages([])
+    if (sessionId && !justCreatedThread) {
+      loadThreadMessages()
+    } else if (!sessionId) {
+      setMessages([])
+    }
     setIsLoading(false)
-  }, [sessionId])
+    // Reset the flag after use
+    if (justCreatedThread) {
+      setJustCreatedThread(false)
+    }
+  }, [sessionId, justCreatedThread])
+  
+  const loadThreadMessages = async () => {
+    if (!sessionId) return
+    
+    try {
+      const { thread, messages: threadMessages } = await api.threads.get(sessionId)
+      if (threadMessages && threadMessages.length > 0) {
+        setMessages(threadMessages.map((msg: any) => ({
+          id: msg.id,
+          role: msg.role,
+          content: msg.content,
+          timestamp: new Date(msg.created_at),
+          tokens: msg.tokens_used
+        })))
+      }
+    } catch (error) {
+      console.error('Failed to load thread messages:', error)
+    }
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -72,6 +102,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       
       // If a new thread was created, notify parent
       if (response.isNewThread && response.threadId && onThreadCreated) {
+        setJustCreatedThread(true)
         onThreadCreated(response.threadId)
       }
       

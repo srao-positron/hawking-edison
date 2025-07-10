@@ -7,6 +7,7 @@ import { createLogger } from '../_shared/logger.ts'
 import { llm, LLMProvider } from '../_shared/llm.ts'
 import { publishToSNS, shouldUseOrchestration } from '../_shared/aws-sns.ts'
 import { corsHeaders } from '../_shared/cors.ts'
+import { generateHumanId } from '../_shared/human-id.ts'
 
 const logger = createLogger('interact')
 
@@ -153,11 +154,13 @@ Deno.serve(async (req) => {
     
     // Create or get thread
     if (!threadId) {
-      // Create new thread with auto-generated title
+      // Create new thread with auto-generated title and human-readable ID
       threadTitle = generateThreadTitle(input)
+      const humanId = generateHumanId()
       const { data: thread, error: threadError } = await supabase
         .from('chat_threads')
         .insert({
+          id: humanId,
           user_id: user!.id,
           title: threadTitle,
           metadata: {}
@@ -190,9 +193,11 @@ Deno.serve(async (req) => {
         
         // Create new thread instead
         threadTitle = generateThreadTitle(input)
+        const newHumanId = generateHumanId()
         const { data: newThread, error: createError } = await supabase
           .from('chat_threads')
           .insert({
+            id: newHumanId,
             user_id: user!.id,
             title: threadTitle,
             metadata: {}

@@ -4,23 +4,27 @@ import { useState, useEffect, useCallback } from 'react'
 import ChatInterface from '@/components/ChatInterface'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { api } from '@/lib/api-client'
 
 export default function ChatPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const params = useParams()
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [refreshThreads, setRefreshThreads] = useState(0)
 
-  // Initialize session from URL or create new
+  // Initialize session from URL (path param takes precedence)
   useEffect(() => {
-    const threadId = searchParams.get('thread')
+    const threadIdFromPath = params.threadId as string
+    const threadIdFromQuery = searchParams.get('thread')
+    const threadId = threadIdFromPath || threadIdFromQuery
+    
     if (threadId) {
       setCurrentSessionId(threadId)
     }
-  }, [searchParams])
+  }, [params.threadId, searchParams])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -37,7 +41,7 @@ export default function ChatPage() {
   const handleSelectChat = async (threadId: string) => {
     try {
       // Update URL and session
-      router.push(`/chat?thread=${threadId}`)
+      router.push(`/chat/${threadId}`)
       setCurrentSessionId(threadId)
     } catch (error) {
       console.error('Failed to load thread:', error)
@@ -48,7 +52,7 @@ export default function ChatPage() {
 
   const handleThreadCreated = useCallback((threadId: string) => {
     // Update URL when a new thread is created
-    router.push(`/chat?thread=${threadId}`)
+    router.push(`/chat/${threadId}`)
     setCurrentSessionId(threadId)
     // Trigger sidebar refresh
     setRefreshThreads(prev => prev + 1)
