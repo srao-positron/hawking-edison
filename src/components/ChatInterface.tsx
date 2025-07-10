@@ -14,10 +14,11 @@ interface Message {
 }
 
 interface ChatInterfaceProps {
-  sessionId?: string
+  sessionId?: string | null
+  onThreadCreated?: (threadId: string) => void
 }
 
-export default function ChatInterface({ sessionId }: ChatInterfaceProps) {
+export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -63,9 +64,16 @@ export default function ChatInterface({ sessionId }: ChatInterfaceProps) {
     setIsLoading(true)
 
     try {
-      const response = await api.interact(input.trim(), { sessionId })
+      const response = await api.interact(input.trim(), { 
+        sessionId: sessionId || undefined 
+      })
       
       console.log('API Response:', response) // Debug log
+      
+      // If a new thread was created, notify parent
+      if (response.threadId && !sessionId && onThreadCreated) {
+        onThreadCreated(response.threadId)
+      }
       
       const assistantMessage: Message = {
         id: response.interactionId || crypto.randomUUID(),

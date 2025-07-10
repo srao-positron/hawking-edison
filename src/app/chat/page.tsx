@@ -1,16 +1,26 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import ChatInterface from '@/components/ChatInterface'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { api } from '@/lib/api-client'
 
 export default function ChatPage() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [currentSessionId, setCurrentSessionId] = useState<string>(crypto.randomUUID())
+  const searchParams = useSearchParams()
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
+  const [refreshThreads, setRefreshThreads] = useState(0)
+
+  // Initialize session from URL or create new
+  useEffect(() => {
+    const threadId = searchParams.get('thread')
+    if (threadId) {
+      setCurrentSessionId(threadId)
+    }
+  }, [searchParams])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -19,14 +29,15 @@ export default function ChatPage() {
   }, [user, loading, router])
 
   const handleNewChat = () => {
-    // Generate new session ID and reset messages
-    setCurrentSessionId(crypto.randomUUID())
+    // Clear current session to start fresh
+    setCurrentSessionId(null)
+    router.push('/chat')
   }
 
   const handleSelectChat = async (threadId: string) => {
     try {
-      // Load conversation history for selected thread
-      const { thread, messages } = await api.threads.get(threadId)
+      // Update URL and session
+      router.push(`/chat?thread=${threadId}`)
       setCurrentSessionId(threadId)
     } catch (error) {
       console.error('Failed to load thread:', error)
@@ -34,6 +45,14 @@ export default function ChatPage() {
       handleNewChat()
     }
   }
+
+  const handleThreadCreated = useCallback((threadId: string) => {
+    // Update URL when a new thread is created
+    router.push(`/chat?thread=${threadId}`)
+    setCurrentSessionId(threadId)
+    // Trigger sidebar refresh
+    setRefreshThreads(prev => prev + 1)
+  }, [router])
 
   if (loading) {
     return (
@@ -56,9 +75,13 @@ export default function ChatPage() {
         currentSessionId={currentSessionId} 
         onNewChat={handleNewChat}
         onSelectChat={handleSelectChat}
+        refreshTrigger={refreshThreads}
       />
       <div className="flex-1">
-        <ChatInterface sessionId={currentSessionId} />
+        <ChatInterface 
+          sessionId={currentSessionId} 
+          onThreadCreated={handleThreadCreated}
+        />
       </div>
     </div>
   )

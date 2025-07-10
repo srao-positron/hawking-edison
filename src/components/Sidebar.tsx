@@ -16,12 +16,13 @@ interface ChatThread {
 }
 
 interface SidebarProps {
-  currentSessionId?: string
+  currentSessionId?: string | null
   onNewChat: () => void
   onSelectChat?: (sessionId: string) => void
+  refreshTrigger?: number
 }
 
-export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: SidebarProps) {
+export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, refreshTrigger }: SidebarProps) {
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [collapsed, setCollapsed] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -29,7 +30,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: S
 
   useEffect(() => {
     loadThreads()
-  }, [])
+  }, [refreshTrigger])
 
   const loadThreads = async () => {
     try {
@@ -92,15 +93,15 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: S
                 threads.map((thread) => (
                   <div
                     key={thread.id}
-                    className={`group relative w-full text-left px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
+                    className={`group relative flex items-start gap-2 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
                       currentSessionId === thread.id ? 'bg-gray-100' : ''
                     }`}
                   >
                     <button
                       onClick={() => onSelectChat?.(thread.id)}
-                      className="w-full text-left"
+                      className="flex-1 text-left min-w-0"
                     >
-                      <div className="font-medium truncate pr-8">
+                      <div className="font-medium truncate">
                         {thread.title || 'Untitled conversation'}
                       </div>
                       <div className="text-xs text-gray-500 mt-0.5">
@@ -110,7 +111,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: S
                     </button>
                     <button
                       onClick={(e) => handleDeleteThread(thread.id, e)}
-                      className="absolute right-2 top-2.5 opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all flex-shrink-0"
                     >
                       <Trash2 className="w-3 h-3 text-gray-500" />
                     </button>

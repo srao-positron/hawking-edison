@@ -10,6 +10,32 @@ import { corsHeaders } from '../_shared/cors.ts'
 
 const logger = createLogger('interact')
 
+// Helper function to generate thread title from first message
+function generateThreadTitle(input: string): string {
+  // Truncate and clean up the input for a title
+  const cleanInput = input.trim()
+    .replace(/[\n\r]+/g, ' ') // Replace newlines with spaces
+    .replace(/\s+/g, ' ') // Normalize whitespace
+    .substring(0, 100) // Limit length
+  
+  // If it's a question, use the question as title
+  if (cleanInput.endsWith('?')) {
+    return cleanInput.length > 50 ? cleanInput.substring(0, 47) + '...' : cleanInput
+  }
+  
+  // For statements, truncate at a reasonable point
+  const truncated = cleanInput.length > 50 ? cleanInput.substring(0, 47) + '...' : cleanInput
+  
+  // If it starts with common command phrases, preserve them
+  const commandPhrases = ['write', 'create', 'help', 'explain', 'show', 'tell', 'make', 'generate', 'find', 'search']
+  const firstWord = cleanInput.toLowerCase().split(' ')[0]
+  if (commandPhrases.includes(firstWord)) {
+    return truncated
+  }
+  
+  return truncated
+}
+
 // Tool registry - will be expanded as we add tools
 const tools = {
   // Placeholder for tool implementations
@@ -125,11 +151,13 @@ Deno.serve(async (req) => {
     
     // Create or get thread
     if (!threadId) {
-      // Create new thread
+      // Create new thread with auto-generated title
+      const threadTitle = generateThreadTitle(input)
       const { data: thread, error: threadError } = await supabase
         .from('chat_threads')
         .insert({
           user_id: user!.id,
+          title: threadTitle,
           metadata: {}
         })
         .select()
@@ -158,10 +186,12 @@ Deno.serve(async (req) => {
         })
         
         // Create new thread instead
+        const newThreadTitle = generateThreadTitle(input)
         const { data: newThread, error: createError } = await supabase
           .from('chat_threads')
           .insert({
             user_id: user!.id,
+            title: newThreadTitle,
             metadata: {}
           })
           .select()
