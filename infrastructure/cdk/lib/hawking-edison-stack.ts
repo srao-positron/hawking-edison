@@ -124,7 +124,7 @@ export class HawkingEdisonStack extends cdk.Stack {
     })
 
     // Create Lambda function to store credentials in Vault
-    const vaultCredentialManager = new lambda.NodejsFunction(this, 'VaultCredentialManager', {
+    const vaultCredentialManager = new lambdaNodejs.NodejsFunction(this, 'VaultCredentialManager', {
       entry: path.join(__dirname, '../lambda/vault-credential-manager.ts'),
       runtime: lambda.Runtime.NODEJS_20_X,
       handler: 'handler',
@@ -140,19 +140,21 @@ export class HawkingEdisonStack extends cdk.Stack {
       },
     })
 
-    // Grant the Lambda permission to read the access key secret
-    accessKey.secretAccessKey.grantRead(vaultCredentialManager)
-
+    // Store the secret access key in environment for the Lambda to retrieve
+    vaultCredentialManager.addEnvironment('ACCESS_KEY_ID', accessKey.accessKeyId)
+    vaultCredentialManager.addEnvironment('REGION', this.region)
+    vaultCredentialManager.addEnvironment('TOPIC_ARN', orchestrationTopic.topicArn)
+    vaultCredentialManager.addEnvironment('SUPABASE_URL', process.env.SUPABASE_URL || 'PLACEHOLDER')
+    vaultCredentialManager.addEnvironment('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER')
+    
+    // Grant permission to retrieve the secret
+    edgeFunctionCredsSecret.grantRead(vaultCredentialManager)
+    
     // Use custom resource to store credentials in Vault
     const storeInVault = new cdk.CustomResource(this, 'StoreCredsInVault', {
       serviceToken: vaultCredentialManager.functionArn,
       properties: {
-        SupabaseUrl: process.env.SUPABASE_URL || 'PLACEHOLDER',
-        SupabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER',
-        AccessKeyId: accessKey.accessKeyId,
-        SecretAccessKey: accessKey.secretAccessKey.unsafeUnwrap(),
-        Region: this.region,
-        TopicArn: orchestrationTopic.topicArn,
+        SecretArn: edgeFunctionCredsSecret.secretArn,
       }
     })
 
