@@ -36,8 +36,8 @@ export async function POST(request: NextRequest) {
       serviceRole: true
     })
     
-    // Store credentials in Vault
-    console.log('Storing AWS credentials in Vault...')
+    // Store credentials in database table (not Vault)
+    console.log('Storing AWS credentials in database...')
     const { error } = await supabase.rpc('store_aws_credentials', {
       p_access_key_id: accessKeyId,
       p_secret_access_key: secretAccessKey,
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
       )
     }
     
-    console.log('Successfully stored AWS credentials in Vault')
+    console.log('Successfully stored AWS credentials in database')
     
     // Verify storage
     const { data: verifyData, error: verifyError } = await supabase.rpc('get_aws_credentials')
@@ -66,7 +66,7 @@ export async function POST(request: NextRequest) {
     
     return NextResponse.json({ 
       success: true,
-      message: 'Credentials stored in Vault',
+      message: 'Credentials stored in database',
       verified: !!verifyData 
     })
     
