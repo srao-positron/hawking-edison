@@ -61,7 +61,9 @@ function deployFunction(functionName: string) {
   console.log(`\n📦 Deploying ${functionName}...`)
   try {
     // Use the beta version with --use-api flag to avoid Docker requirement
-    const command = `npx supabase@beta functions deploy ${functionName} --project-ref ${PROJECT_ID} --use-api`
+    // Deploy vault-store without JWT verification since it's an internal service
+    const noVerifyJwt = functionName === 'vault-store' ? '--no-verify-jwt' : ''
+    const command = `npx supabase@beta functions deploy ${functionName} --project-ref ${PROJECT_ID} --use-api ${noVerifyJwt}`
     
     execSync(command, { 
       stdio: 'inherit',
