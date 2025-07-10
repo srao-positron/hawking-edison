@@ -6,6 +6,7 @@ import { createResponse, createErrorResponse } from '../_shared/response.ts'
 import { createLogger } from '../_shared/logger.ts'
 import { llm, LLMProvider } from '../_shared/llm.ts'
 import { publishToSNS, shouldUseOrchestration } from '../_shared/aws-sns.ts'
+import { corsHeaders } from '../_shared/cors.ts'
 
 const logger = createLogger('interact')
 
@@ -38,13 +39,7 @@ Deno.serve(async (req) => {
 
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, {
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-      }
-    })
+    return new Response(null, { headers: corsHeaders })
   }
 
   // Only accept POST requests

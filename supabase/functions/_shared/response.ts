@@ -35,7 +35,7 @@ export function createResponse<T>(
     headers: { 
       'Content-Type': 'application/json',
       'X-Request-Id': response.metadata!.requestId,
-      ...corsHeaders(origin || undefined)
+      ...corsHeaders
     },
     status: error ? 400 : 200
   })
@@ -61,7 +61,7 @@ export function createErrorResponse(
     headers: { 
       'Content-Type': 'application/json',
       'X-Request-Id': response.metadata!.requestId,
-      ...corsHeaders(origin || undefined)
+      ...corsHeaders
     },
     status
   })

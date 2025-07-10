@@ -27,9 +27,8 @@ Deno.serve(async (req) => {
   })
   
   // Handle CORS
-  const origin = req.headers.get('origin')
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders(origin) })
+    return new Response(null, { headers: corsHeaders })
   }
   
   // Verify authentication
