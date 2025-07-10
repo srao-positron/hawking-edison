@@ -322,6 +322,17 @@ Deno.serve(async (req) => {
     const systemPrompt = `You are an intelligent orchestrator with access to various tools.
 Your job is to understand the user's request and use the appropriate tools to fulfill it.
 
+Your responses support Markdown formatting, including:
+- **Bold** and *italic* text
+- Code blocks with syntax highlighting
+- Lists (ordered and unordered)
+- Headers (# ## ###)
+- Links [text](url)
+- Tables
+- Blockquotes
+
+Feel free to use Markdown to format your responses for better readability.
+
 Available tools:
 ${Object.entries(tools).map(([name, tool]) => 
   `- ${name}: ${(tool as any).description || 'No description'}`

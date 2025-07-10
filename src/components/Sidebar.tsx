@@ -29,21 +29,36 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
   const { user } = useAuth()
 
   useEffect(() => {
-    loadThreads()
-  }, [refreshTrigger])
+    loadThreads(true)
+    
+    // Poll for updates every 5 seconds when component is mounted
+    const interval = setInterval(() => {
+      loadThreads(false)
+    }, 5000)
+    
+    return () => clearInterval(interval)
+  }, [])
 
-  const loadThreads = async () => {
+  const loadThreads = async (isInitialLoad = false) => {
     try {
-      setLoading(true)
+      if (isInitialLoad) setLoading(true)
       const response = await api.threads.list()
       // Handle both { threads: [...] } and direct array responses
       const threadData = response.threads || response || []
-      setThreads(Array.isArray(threadData) ? threadData : [])
+      const newThreads = Array.isArray(threadData) ? threadData : []
+      
+      // Only update if threads have changed (compare IDs)
+      const currentIds = threads.map(t => t.id).join(',')
+      const newIds = newThreads.map(t => t.id).join(',')
+      
+      if (currentIds !== newIds || threads.length === 0) {
+        setThreads(newThreads)
+      }
     } catch (error) {
       console.error('Failed to load threads:', error)
-      setThreads([]) // Ensure threads is always an array
+      if (isInitialLoad) setThreads([])
     } finally {
-      setLoading(false)
+      if (isInitialLoad) setLoading(false)
     }
   }
 
@@ -70,7 +85,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
       <div className="p-4 border-b border-gray-200">
         <button
           onClick={onNewChat}
-          className="w-full bg-white border border-gray-300 rounded-lg py-2.5 px-3 text-sm font-medium hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-blue-600 text-white border border-blue-600 rounded-lg py-2.5 px-3 text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
         >
           <MessageSquare className="w-4 h-4" />
           {!collapsed && 'New chat'}
@@ -93,8 +108,8 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
                 threads.map((thread) => (
                   <div
                     key={thread.id}
-                    className={`group relative flex items-start gap-2 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
-                      currentSessionId === thread.id ? 'bg-gray-100' : ''
+                    className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
+                      currentSessionId === thread.id ? 'bg-blue-50 border border-blue-200' : ''
                     }`}
                   >
                     <button
@@ -111,7 +126,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
                     </button>
                     <button
                       onClick={(e) => handleDeleteThread(thread.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all flex-shrink-0"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all flex-shrink-0 self-center"
                     >
                       <Trash2 className="w-3 h-3 text-gray-500" />
                     </button>

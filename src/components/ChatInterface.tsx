@@ -3,6 +3,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Paperclip, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Message {
   id: string
@@ -175,7 +177,16 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                           : 'bg-blue-600 text-white'
                       } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
                     >
-                      <p className="whitespace-pre-wrap">{message.content}</p>
+                      {message.role === 'assistant' ? (
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          className="prose prose-sm max-w-none dark:prose-invert"
+                        >
+                          {message.content}
+                        </ReactMarkdown>
+                      ) : (
+                        <p className="whitespace-pre-wrap">{message.content}</p>
+                      )}
                     </div>
                     <div className="mt-1 text-xs text-gray-500 px-1">
                       {message.timestamp.toLocaleTimeString()}
