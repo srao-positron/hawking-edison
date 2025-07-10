@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     hasVaultStoreServiceKey: hasServiceKey,
     hasSupabaseServiceRoleKey: hasSupabaseKey,
     serviceKeyPrefix: process.env.VAULT_STORE_SERVICE_KEY?.substring(0, 10) || 'NOT_SET',
-    message: 'Environment check complete'
+    message: 'Environment check complete',
+    timestamp: new Date().toISOString()
   })
 }
