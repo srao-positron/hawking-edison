@@ -97,8 +97,10 @@ export class HawkingEdisonStack extends cdk.Stack {
 
     // Grant Edge Functions permission to publish to SNS
     // This requires creating an IAM user for Supabase Edge Functions
+    // Use a timestamp to ensure unique name in case of conflicts
+    const timestamp = Date.now()
     const edgeFunctionUser = new iam.User(this, 'EdgeFunctionUser', {
-      userName: `hawking-edison-edge-functions-${this.stackName}`,
+      userName: `hawking-edison-edge-functions-${timestamp}`,
     })
 
     // Create access key for Edge Function user
