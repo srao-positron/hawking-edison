@@ -180,6 +180,10 @@ export const api = {
       mode: 'sync'
     })
     
+    // Use custom domain if available
+    const edgeFunctionsUrl = process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
+    console.log('[Interact] Using Edge Functions URL:', edgeFunctionsUrl)
+    
     const { data, error } = await supabase.functions.invoke('interact', {
       body: { 
         input, 
@@ -187,6 +191,13 @@ export const api = {
         context: options?.sessionId ? { sessionId: options.sessionId } : undefined,
         mode: 'sync' // Use synchronous mode to get immediate responses
       }
+    }, {
+      // Override the default URL if custom domain is configured
+      ...(process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL ? {
+        headers: {
+          'x-custom-domain': process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL
+        }
+      } : {})
     })
     
     if (error) {
@@ -363,7 +374,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads?limit=${limit}&offset=${offset}`
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads?limit=${limit}&offset=${offset}`
       
       const response = await fetch(url, {
         method: 'GET',
@@ -390,7 +401,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
       
       const response = await fetch(url, {
         method: 'GET',
@@ -423,7 +434,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads`
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads`
       
       const response = await fetch(url, {
         method: 'POST',
@@ -451,7 +462,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
       
       const response = await fetch(url, {
         method: 'PUT',
@@ -479,7 +490,7 @@ export const api = {
         throw new Error('Not authenticated')
       }
 
-      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
       
       const response = await fetch(url, {
         method: 'DELETE',
