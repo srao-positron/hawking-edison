@@ -178,12 +178,11 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                       } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
                     >
                       {message.role === 'assistant' ? (
-                        <ReactMarkdown 
-                          remarkPlugins={[remarkGfm]}
-                          className="prose prose-sm max-w-none dark:prose-invert"
-                        >
-                          {message.content}
-                        </ReactMarkdown>
+                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                            {message.content}
+                          </ReactMarkdown>
+                        </div>
                       ) : (
                         <p className="whitespace-pre-wrap">{message.content}</p>
                       )}
