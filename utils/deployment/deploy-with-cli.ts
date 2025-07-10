@@ -9,7 +9,7 @@ import { execSync } from 'child_process'
 config({ path: join(process.cwd(), '.env.local') })
 
 const PROJECT_ID = 'bknpldydmkzupsfagnva'
-const FUNCTIONS = ['interact', 'databank', 'memories', 'auth-api-keys', 'chat-threads']
+const FUNCTIONS = ['interact', 'databank', 'memories', 'auth-api-keys', 'chat-threads', 'vault-store']
 
 // Check requirements
 function checkRequirements() {
@@ -82,7 +82,8 @@ function setSecrets() {
   
   // Create temporary env file
   const envContent = `ANTHROPIC_API_KEY=${process.env.ANTHROPIC_API_KEY}
-OPENAI_API_KEY=${process.env.OPENAI_API_KEY}`
+OPENAI_API_KEY=${process.env.OPENAI_API_KEY}
+VAULT_STORE_SERVICE_KEY=${process.env.VAULT_STORE_SERVICE_KEY}`
   
   require('fs').writeFileSync('.env.functions', envContent)
   
