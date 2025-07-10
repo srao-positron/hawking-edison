@@ -48,7 +48,7 @@ async function checkOrchestration(sessionId?: string) {
     // List recent sessions
     const { data: sessions, error } = await supabase
       .from('orchestration_sessions')
-      .select('id, status, created_at, updated_at, metadata')
+      .select('id, status, created_at, updated_at')
       .order('created_at', { ascending: false })
       .limit(10)
     
@@ -68,9 +68,6 @@ async function checkOrchestration(sessionId?: string) {
       console.log(`   Status: ${session.status}`)
       console.log(`   Created: ${new Date(session.created_at).toLocaleString()}`)
       console.log(`   Duration: ${duration > 0 ? `${Math.round(duration / 1000)}s` : 'N/A'}`)
-      if (session.metadata?.thread_id) {
-        console.log(`   Thread: ${session.metadata.thread_id}`)
-      }
       console.log('')
     }
     
