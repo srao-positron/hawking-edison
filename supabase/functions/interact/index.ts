@@ -148,11 +148,13 @@ Deno.serve(async (req) => {
     // Handle chat thread
     let threadId = context?.sessionId
     let messages: any[] = []
+    let isNewThread = false
+    let threadTitle: string | null = null
     
     // Create or get thread
     if (!threadId) {
       // Create new thread with auto-generated title
-      const threadTitle = generateThreadTitle(input)
+      threadTitle = generateThreadTitle(input)
       const { data: thread, error: threadError } = await supabase
         .from('chat_threads')
         .insert({
@@ -169,6 +171,7 @@ Deno.serve(async (req) => {
       }
       
       threadId = thread.id
+      isNewThread = true
     } else {
       // Verify thread exists and belongs to user
       const { data: thread, error: threadError } = await supabase
@@ -186,12 +189,12 @@ Deno.serve(async (req) => {
         })
         
         // Create new thread instead
-        const newThreadTitle = generateThreadTitle(input)
+        threadTitle = generateThreadTitle(input)
         const { data: newThread, error: createError } = await supabase
           .from('chat_threads')
           .insert({
             user_id: user!.id,
-            title: newThreadTitle,
+            title: threadTitle,
             metadata: {}
           })
           .select()
@@ -203,6 +206,7 @@ Deno.serve(async (req) => {
         }
         
         threadId = newThread.id
+        isNewThread = true
         messages = [] // Start fresh with new thread
       } else {
         // Get existing thread messages
@@ -376,6 +380,8 @@ Be creative in how you combine tools to solve problems.`
     return createResponse({
       interactionId: interaction.id,
       threadId: threadId,
+      threadTitle: isNewThread ? threadTitle : undefined,
+      isNewThread: isNewThread,
       response: llmResponse.content,
       usage: llmResponse.usage
     })

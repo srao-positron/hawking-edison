@@ -71,7 +71,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       console.log('API Response:', response) // Debug log
       
       // If a new thread was created, notify parent
-      if (response.threadId && !sessionId && onThreadCreated) {
+      if (response.isNewThread && response.threadId && onThreadCreated) {
         onThreadCreated(response.threadId)
       }
       
