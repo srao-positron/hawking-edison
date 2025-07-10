@@ -54,7 +54,8 @@ export default function ChatPage() {
     // Update URL when a new thread is created
     router.push(`/chat/${threadId}`)
     setCurrentSessionId(threadId)
-    // Don't refresh entire sidebar, just update state
+    // Trigger a single refresh of the thread list
+    setRefreshThreads(prev => prev + 1)
   }, [router])
 
   if (loading) {

@@ -39,6 +39,13 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
     return () => clearInterval(interval)
   }, [])
 
+  // Refresh when refreshTrigger changes (e.g., new thread created)
+  useEffect(() => {
+    if (refreshTrigger && refreshTrigger > 0) {
+      loadThreads(false)
+    }
+  }, [refreshTrigger])
+
   const loadThreads = async (isInitialLoad = false) => {
     try {
       if (isInitialLoad) setLoading(true)
@@ -47,11 +54,18 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
       const threadData = response.threads || response || []
       const newThreads = Array.isArray(threadData) ? threadData : []
       
-      // Only update if threads have changed (compare IDs)
-      const currentIds = threads.map(t => t.id).join(',')
-      const newIds = newThreads.map(t => t.id).join(',')
+      // More comprehensive comparison to avoid unnecessary updates
+      const hasChanges = threads.length !== newThreads.length || 
+        threads.some((oldThread, index) => {
+          const newThread = newThreads[index]
+          return !newThread || 
+                 oldThread.id !== newThread.id || 
+                 oldThread.title !== newThread.title ||
+                 oldThread.message_count !== newThread.message_count ||
+                 oldThread.updated_at !== newThread.updated_at
+        })
       
-      if (currentIds !== newIds || threads.length === 0) {
+      if (hasChanges || threads.length === 0) {
         setThreads(newThreads)
       }
     } catch (error) {
@@ -85,7 +99,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
       <div className="p-4 border-b border-gray-200">
         <button
           onClick={onNewChat}
-          className="w-full bg-blue-600 text-white border border-blue-600 rounded-lg py-2.5 px-3 text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2"
+          className="w-full bg-blue-600 text-white rounded-lg py-2.5 px-3 text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           <MessageSquare className="w-4 h-4" />
           {!collapsed && 'New chat'}
@@ -109,26 +123,28 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
                   <div
                     key={thread.id}
                     className={`group relative flex items-center gap-2 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition-colors ${
-                      currentSessionId === thread.id ? 'bg-blue-50 border border-blue-200' : ''
+                      currentSessionId === thread.id ? 'bg-blue-100 border-2 border-blue-500 shadow-sm' : 'border-2 border-transparent'
                     }`}
                   >
                     <button
                       onClick={() => onSelectChat?.(thread.id)}
-                      className="flex-1 text-left min-w-0"
+                      className="flex-1 text-left min-w-0 flex items-center"
                     >
-                      <div className="font-medium truncate">
-                        {thread.title || 'Untitled conversation'}
-                      </div>
-                      <div className="text-xs text-gray-500 mt-0.5">
-                        {new Date(thread.updated_at).toLocaleDateString()}
-                        {thread.message_count > 0 && ` • ${thread.message_count} messages`}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium truncate">
+                          {thread.title || 'Untitled conversation'}
+                        </div>
+                        <div className="text-xs text-gray-500 mt-0.5">
+                          {new Date(thread.updated_at).toLocaleDateString()}
+                          {thread.message_count > 0 && ` • ${thread.message_count} messages`}
+                        </div>
                       </div>
                     </button>
                     <button
                       onClick={(e) => handleDeleteThread(thread.id, e)}
-                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-gray-200 rounded transition-all flex-shrink-0 self-center"
+                      className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-100 rounded transition-all flex-shrink-0"
                     >
-                      <Trash2 className="w-3 h-3 text-gray-500" />
+                      <Trash2 className="w-4 h-4 text-red-500" />
                     </button>
                   </div>
                 ))

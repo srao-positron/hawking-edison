@@ -28,22 +28,27 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Keep track of whether we just created a thread
-  const [justCreatedThread, setJustCreatedThread] = useState(false)
+  // Keep track of the previous sessionId to avoid unnecessary reloads
+  const prevSessionIdRef = useRef<string | null>(null)
   
-  // Load messages when sessionId changes (unless we just created the thread)
+  // Load messages when sessionId changes
   useEffect(() => {
-    if (sessionId && !justCreatedThread) {
-      loadThreadMessages()
+    // Only load if sessionId actually changed
+    if (sessionId && sessionId !== prevSessionIdRef.current) {
+      // Don't load messages if this is a new thread (messages will be empty anyway)
+      const isNewThread = sessionId.includes('-') && messages.length > 0 && 
+                         messages[messages.length - 1].role === 'assistant'
+      
+      if (!isNewThread) {
+        loadThreadMessages()
+      }
+      prevSessionIdRef.current = sessionId
     } else if (!sessionId) {
       setMessages([])
+      prevSessionIdRef.current = null
     }
     setIsLoading(false)
-    // Reset the flag after use
-    if (justCreatedThread) {
-      setJustCreatedThread(false)
-    }
-  }, [sessionId, justCreatedThread])
+  }, [sessionId])
   
   const loadThreadMessages = async () => {
     if (!sessionId) return
@@ -104,7 +109,6 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       
       // If a new thread was created, notify parent
       if (response.isNewThread && response.threadId && onThreadCreated) {
-        setJustCreatedThread(true)
         onThreadCreated(response.threadId)
       }
       
@@ -178,7 +182,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                       } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
                     >
                       {message.role === 'assistant' ? (
-                        <div className="prose prose-sm max-w-none dark:prose-invert">
+                        <div className="prose prose-sm max-w-none">
                           <ReactMarkdown remarkPlugins={[remarkGfm]}>
                             {message.content}
                           </ReactMarkdown>
@@ -248,8 +252,8 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                 disabled={!input.trim() || isLoading}
                 className={`p-2 rounded-lg transition-colors ${
                   input.trim() && !isLoading
-                    ? 'text-gray-600 hover:bg-gray-100'
-                    : 'text-gray-300'
+                    ? 'bg-blue-600 text-white hover:bg-blue-700'
+                    : 'bg-gray-200 text-gray-400 cursor-not-allowed'
                 }`}
               >
                 <Send className="w-4 h-4" />
