@@ -6,13 +6,18 @@ export async function POST(request: NextRequest) {
   try {
     // Verify service key
     const serviceKey = request.headers.get('x-service-key')
-    const expectedServiceKey = process.env.VAULT_STORE_SERVICE_KEY || 'EY2LySQVi9ZOHzvKmkkMCR6sGCdc25G3KIO0oVzBbYM'
+    const expectedServiceKey = process.env.VAULT_STORE_SERVICE_KEY
+    
+    if (!expectedServiceKey) {
+      console.error('VAULT_STORE_SERVICE_KEY not configured')
+      return NextResponse.json(
+        { error: 'Service not configured' },
+        { status: 503 }
+      )
+    }
     
     if (!serviceKey || serviceKey !== expectedServiceKey) {
-      console.error('Service key mismatch:', {
-        provided: serviceKey?.substring(0, 10),
-        expected: expectedServiceKey?.substring(0, 10)
-      })
+      console.error('Service key mismatch')
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }

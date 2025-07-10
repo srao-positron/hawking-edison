@@ -43,7 +43,7 @@ async function verifyVaultAutomation() {
     const validations = [
       { field: 'accessKeyId', check: data.accessKeyId?.startsWith('AKIA'), desc: 'Access Key format' },
       { field: 'secretAccessKey', check: data.secretAccessKey?.length > 20, desc: 'Secret Key length' },
-      { field: 'region', check: data.region === 'us-east-1', desc: 'AWS Region' },
+      { field: 'region', check: data.region === 'us-east-1' || data.region === 'us-east-2', desc: 'AWS Region' },
       { field: 'topicArn', check: data.topicArn?.includes('hawking-edison'), desc: 'Topic ARN' }
     ]
     
