@@ -169,9 +169,14 @@ export const apiClient = new ApiClient()
 
 // Export specific API methods
 export const api = {
-  // Interact endpoint - Call Edge Function directly
+  // Interact endpoint - Use direct fetch like chat-threads
   interact: async (input: string, options?: { provider?: string; sessionId?: string }) => {
     const supabase = getBrowserClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
+      throw new Error('Not authenticated')
+    }
     
     console.log('[Interact] Calling Edge Function with:', {
       input: input.substring(0, 100) + '...',
@@ -180,66 +185,51 @@ export const api = {
       mode: 'sync'
     })
     
-    // Use custom domain if available
-    const edgeFunctionsUrl = process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-    console.log('[Interact] Using Edge Functions URL:', edgeFunctionsUrl)
+    const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/interact`
+    console.log('[Interact] Using URL:', url)
     
-    const { data, error } = await supabase.functions.invoke('interact', {
-      body: { 
-        input, 
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        input,
         provider: options?.provider,
         context: options?.sessionId ? { sessionId: options.sessionId } : undefined,
-        mode: 'sync' // Use synchronous mode to get immediate responses
-      }
-    }, {
-      // Override the default URL if custom domain is configured
-      ...(process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL ? {
-        headers: {
-          'x-custom-domain': process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL
-        }
-      } : {})
+        mode: 'sync'
+      })
     })
     
-    if (error) {
-      if (error instanceof FunctionsHttpError) {
-        const errorMessage = await error.context.json()
-        console.error('[Interact] Edge Function HTTP error:', {
-          status: error.context.status,
-          statusText: error.context.statusText,
-          error: errorMessage,
-          headers: Object.fromEntries(error.context.headers.entries())
-        })
-        throw new Error(errorMessage.error?.message || errorMessage.message || 'Edge Function error')
-      } else if (error instanceof FunctionsRelayError) {
-        console.error('[Interact] Relay error:', error.message)
-        throw new Error(`Relay error: ${error.message}`)
-      } else if (error instanceof FunctionsFetchError) {
-        console.error('[Interact] Fetch error:', error.message)
-        throw new Error(`Fetch error: ${error.message}`)
-      }
-      console.error('[Interact] Unknown error:', error)
-      throw error
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+      console.error('[Interact] Edge Function error:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData
+      })
+      throw new Error(errorData.error?.message || errorData.message || `Edge Function error: ${response.status}`)
     }
     
+    const result = await response.json()
     console.log('[Interact] Edge Function response:', {
-      hasData: !!data,
-      dataKeys: data ? Object.keys(data) : [],
-      fullResponse: data
+      hasData: !!result,
+      dataKeys: result ? Object.keys(result) : [],
+      success: result.success
     })
     
-    // The Edge Function returns { success, data, metadata }
-    // We need to extract the data portion
-    if (data && data.data) {
-      return data.data
+    // Handle different response formats
+    if (result.success && result.data) {
+      return result.data
+    } else if (result.data) {
+      return result.data
+    } else if (result.response || result.threadId || result.interactionId) {
+      // Direct response format from interact endpoint
+      return result
     }
     
-    // If there's no nested data property, return the whole response
-    if (data) {
-      console.warn('[Interact] No data.data property, returning full response')
-      return data
-    }
-    
-    throw new Error('Invalid response from Edge Function')
+    throw new Error('Invalid response format from Edge Function')
   },
 
   // Streaming interact endpoint using Server-Sent Events
@@ -570,78 +560,118 @@ export const api = {
     }
   },
 
-  // API Key endpoints - Call Edge Functions directly
+  // API Key endpoints - Use direct fetch like other endpoints
   apiKeys: {
     list: async () => {
       const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
-        body: { action: 'list' }
-      })
-      
-      if (error) {
-        if (error instanceof FunctionsHttpError) {
-          const errorMessage = await error.context.json()
-          throw new Error(errorMessage.error?.message || 'Failed to fetch API keys')
-        }
-        throw new Error(error.message || 'Failed to fetch API keys')
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
       }
       
-      return data?.data || []
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'list' })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to fetch API keys')
+      }
+      
+      const result = await response.json()
+      return result.data || []
     },
     
     create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {
       const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
-        body: { action: 'create', name, expiresInDays, environment }
-      })
-      
-      if (error) {
-        if (error instanceof FunctionsHttpError) {
-          const errorMessage = await error.context.json()
-          throw new Error(errorMessage.error?.message || 'Failed to create API key')
-        }
-        throw new Error(error.message || 'Failed to create API key')
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
       }
       
-      return data?.data
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'create', name, expiresInDays, environment })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to create API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     revoke: async (id: string) => {
       const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
-        body: { action: 'revoke', id }
-      })
-      
-      if (error) {
-        if (error instanceof FunctionsHttpError) {
-          const errorMessage = await error.context.json()
-          throw new Error(errorMessage.error?.message || 'Failed to revoke API key')
-        }
-        throw new Error(error.message || 'Failed to revoke API key')
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
       }
       
-      return data?.data
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'revoke', id })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to revoke API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
     
     delete: async (id: string) => {
       const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
       
-      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
-        body: { action: 'delete', id }
-      })
-      
-      if (error) {
-        if (error instanceof FunctionsHttpError) {
-          const errorMessage = await error.context.json()
-          throw new Error(errorMessage.error?.message || 'Failed to delete API key')
-        }
-        throw new Error(error.message || 'Failed to delete API key')
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
       }
       
-      return data?.data
+      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ action: 'delete', id })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to delete API key')
+      }
+      
+      const result = await response.json()
+      return result.data
     }
   }
 }
