@@ -112,8 +112,8 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         onThreadCreated(response.threadId)
       }
       
-      // Check if this is an async response
-      if (response.async && response.sessionId) {
+      // Check if this is an async response (status: 'processing' indicates async)
+      if ((response.async || response.status === 'processing') && response.sessionId) {
         // Create a placeholder message with thinking indicator
         const thinkingMessage: Message = {
           id: response.sessionId,
@@ -125,8 +125,9 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         setMessages(prev => [...prev, thinkingMessage])
         
         // Connect to SSE stream for real-time updates
+        const edgeFunctionsUrl = process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
         const eventSource = new EventSource(
-          `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/stream?sessionId=${response.sessionId}`,
+          `${edgeFunctionsUrl}/functions/v1/stream?sessionId=${response.sessionId}`,
           {
             headers: {
               'Authorization': `Bearer ${(await api.getSession())?.access_token}`

@@ -18,3 +18,10 @@
  ✓ Compiled /_not-found in 906ms (3318 modules)
  GET /.well-known/appspecific/com.chrome.devtools.json 404 in 991ms
  GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 285ms
+ GET /chat 200 in 147ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 20ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 52ms
+ ✓ Compiled in 689ms (3328 modules)
+ GET /chat 200 in 57ms
+ ✓ Compiled in 295ms (3328 modules)
+ GET /chat 200 in 35ms
