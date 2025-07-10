@@ -142,22 +142,56 @@ Deno.serve(async (req) => {
       
       threadId = thread.id
     } else {
-      // Get existing thread messages
-      const { data: existingMessages, error: messagesError } = await supabase
-        .from('chat_messages')
-        .select('*')
-        .eq('thread_id', threadId)
-        .order('created_at', { ascending: true })
+      // Verify thread exists and belongs to user
+      const { data: thread, error: threadError } = await supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('id', threadId)
+        .eq('user_id', user!.id)
+        .single()
       
-      if (messagesError) {
-        logger.error('Failed to get messages', messagesError)
-        return createErrorResponse('DB_ERROR', 'Failed to get thread messages')
+      if (threadError || !thread) {
+        logger.warn('Thread not found or unauthorized, creating new thread', { 
+          threadId, 
+          userId: user!.id,
+          error: threadError 
+        })
+        
+        // Create new thread instead
+        const { data: newThread, error: createError } = await supabase
+          .from('chat_threads')
+          .insert({
+            user_id: user!.id,
+            metadata: {}
+          })
+          .select()
+          .single()
+        
+        if (createError) {
+          logger.error('Failed to create new thread', createError)
+          return createErrorResponse('DB_ERROR', 'Failed to create chat thread')
+        }
+        
+        threadId = newThread.id
+        messages = [] // Start fresh with new thread
+      } else {
+        // Get existing thread messages
+        const { data: existingMessages, error: messagesError } = await supabase
+          .from('chat_messages')
+          .select('*')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: true })
+        
+        if (messagesError) {
+          logger.error('Failed to get messages', messagesError)
+          return createErrorResponse('DB_ERROR', 'Failed to get thread messages')
+        }
+        
+        messages = existingMessages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        }))
       }
-      
-      messages = existingMessages.map(msg => ({
-        role: msg.role,
-        content: msg.content
-      }))
     }
     
     // Add user message to thread
@@ -290,6 +324,12 @@ Be creative in how you combine tools to solve problems.`
     if (assistantMsgError) {
       logger.error('Failed to save assistant message', assistantMsgError)
     }
+    
+    // Update thread's updated_at timestamp
+    await supabase
+      .from('chat_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId)
     
     // Update interaction with result
     await supabase
