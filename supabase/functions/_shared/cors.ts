@@ -1,5 +1,13 @@
 // CORS headers for Edge Functions
-export const corsHeaders = (origin?: string) => {
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
+  'Access-Control-Allow-Credentials': 'true'
+}
+
+// Get CORS headers with specific origin (for production use)
+export const getCorsHeaders = (origin?: string) => {
   // Allow requests from hawkingedison.com and its subdomains
   const allowedOrigins = [
     'https://hawkingedison.com',
@@ -16,7 +24,7 @@ export const corsHeaders = (origin?: string) => {
   )
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://hawkingedison.com',
+    'Access-Control-Allow-Origin': isAllowed ? origin : '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-user-id',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true'

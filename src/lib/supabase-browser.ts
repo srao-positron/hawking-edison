@@ -2,24 +2,37 @@
 import { createBrowserClient } from '@supabase/ssr'
 import { Database } from './database.types'
 
+// Helper to parse cookies properly
+function parseCookieString(str: string): { [key: string]: string } {
+  const cookies: { [key: string]: string } = {}
+  
+  if (!str) return cookies
+  
+  str.split(';').forEach(cookie => {
+    const parts = cookie.split('=')
+    if (parts.length >= 2) {
+      const key = parts[0].trim()
+      const value = parts.slice(1).join('=').trim() // Handle values with '=' in them
+      if (key) {
+        cookies[decodeURIComponent(key)] = decodeURIComponent(value)
+      }
+    }
+  })
+  
+  return cookies
+}
+
 export function createClient() {
   return createBrowserClient<Database>(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        // In production, ensure cookies work across subdomains
         get(name: string) {
-          // Get cookie value
-          const value = document.cookie
-            .split('; ')
-            .find(row => row.startsWith(name + '='))
-            ?.split('=')[1]
-          
-          return value || null
+          const cookies = parseCookieString(document.cookie)
+          return cookies[name]
         },
         set(name: string, value: string, options?: any) {
-          // Set cookie with proper domain for production
           let cookieString = `${name}=${value}`
           
           if (options?.maxAge) {
@@ -28,46 +41,21 @@ export function createClient() {
           if (options?.expires) {
             cookieString += `; Expires=${options.expires.toUTCString()}`
           }
-          if (options?.path) {
-            cookieString += `; Path=${options.path}`
-          }
           
-          // In production, set domain to .hawkingedison.com for cross-subdomain access
-          if (process.env.NODE_ENV === 'production') {
-            cookieString += '; Domain=.hawkingedison.com'
-            cookieString += '; Secure'
-          }
-          
-          cookieString += '; SameSite=Lax'
+          cookieString += `; Path=/`
+          cookieString += `; SameSite=lax`
           
           document.cookie = cookieString
         },
-        remove(name: string, options?: any) {
-          // Remove cookie
-          let cookieString = `${name}=; Max-Age=0`
-          
-          if (options?.path) {
-            cookieString += `; Path=${options.path}`
-          }
-          
-          // In production, ensure we remove from the correct domain
-          if (process.env.NODE_ENV === 'production') {
-            cookieString += '; Domain=.hawkingedison.com'
-          }
-          
-          document.cookie = cookieString
+        remove(name: string) {
+          document.cookie = `${name}=; Max-Age=0; Path=/`
         }
       }
     }
   )
 }
 
-// Export a singleton instance for the browser
-let browserClient: ReturnType<typeof createClient> | undefined
-
+// Don't use singleton - create new instance each time to ensure fresh cookies
 export function getBrowserClient() {
-  if (!browserClient && typeof window !== 'undefined') {
-    browserClient = createClient()
-  }
-  return browserClient!
+  return createClient()
 }

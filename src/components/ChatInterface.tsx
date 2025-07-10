@@ -65,16 +65,20 @@ export default function ChatInterface({ sessionId }: ChatInterfaceProps) {
     try {
       const response = await api.interact(input.trim(), { sessionId })
       
+      console.log('API Response:', response) // Debug log
+      
       const assistantMessage: Message = {
-        id: response.interactionId,
+        id: response.interactionId || crypto.randomUUID(),
         role: 'assistant',
-        content: response.response,
+        content: response.response || 'No response received',
         timestamp: new Date(),
         tokens: response.usage?.totalTokens
       }
 
       setMessages(prev => [...prev, assistantMessage])
     } catch (error) {
+      console.error('Chat error:', error) // Debug log
+      
       const errorMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
@@ -128,9 +132,9 @@ export default function ChatInterface({ sessionId }: ChatInterfaceProps) {
                     <div
                       className={`rounded-lg px-4 py-3 ${
                         message.role === 'assistant'
-                          ? 'bg-white border border-gray-200'
+                          ? 'bg-white border border-gray-200 text-gray-900'
                           : 'bg-blue-600 text-white'
-                      } ${message.error ? 'border-red-300 bg-red-50' : ''}`}
+                      } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
                     >
                       <p className="whitespace-pre-wrap">{message.content}</p>
                     </div>
@@ -153,9 +157,9 @@ export default function ChatInterface({ sessionId }: ChatInterfaceProps) {
                   </div>
                   <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
                     <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                      <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                      <div key="dot-1" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                      <div key="dot-2" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                      <div key="dot-3" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
                     </div>
                   </div>
                 </div>
@@ -176,7 +180,7 @@ export default function ChatInterface({ sessionId }: ChatInterfaceProps) {
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="How can I help you today?"
-              className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent bg-white"
+              className="w-full px-4 py-3 pr-24 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent bg-white text-gray-900 placeholder-gray-500"
               rows={1}
               style={{ maxHeight: '200px' }}
             />

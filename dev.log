@@ -1,0 +1,27 @@
+
+> hawking-edison@0.1.0 dev
+> next dev
+
+   ▲ Next.js 15.3.5
+   - Local:        http://localhost:3002
+   - Network:      http://10.0.10.238:3002
+   - Environments: .env.local, .env
+
+ ✓ Starting...
+ ✓ Ready in 1148ms
+ ✓ Compiled /middleware in 408ms (180 modules)
+ ○ Compiling /auth/login ...
+ ✓ Compiled /auth/login in 6s (2826 modules)
+ GET /auth/login 200 in 6357ms
+ ✓ Compiled in 503ms (1130 modules)
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 1503ms (2794 modules)
+ GET /_next/static/chunks/app/(with-nav)/auth/login/UnstyledButton.module.css.mjs.map 404 in 1159ms
+ GET /_next/static/chunks/app/(with-nav)/UnstyledButton.module.css.mjs.map 404 in 1611ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 1148ms
+ GET /auth/login? 200 in 125ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 18ms
+ GET /_next/static/chunks/app/(with-nav)/UnstyledButton.module.css.mjs.map 404 in 15ms
+ GET /_next/static/chunks/app/(with-nav)/auth/login/UnstyledButton.module.css.mjs.map 404 in 16ms
+ GET /_next/static/chunks/app/VisuallyHidden.module.css.mjs.map 404 in 34ms
+[?25h

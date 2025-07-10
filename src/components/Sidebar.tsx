@@ -34,10 +34,13 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat }: S
   const loadThreads = async () => {
     try {
       setLoading(true)
-      const { threads: data } = await api.threads.list()
-      setThreads(data)
+      const response = await api.threads.list()
+      // Handle both { threads: [...] } and direct array responses
+      const threadData = response.threads || response || []
+      setThreads(Array.isArray(threadData) ? threadData : [])
     } catch (error) {
       console.error('Failed to load threads:', error)
+      setThreads([]) // Ensure threads is always an array
     } finally {
       setLoading(false)
     }

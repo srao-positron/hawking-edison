@@ -205,3 +205,24 @@ export async function verifyApiKey(req: Request) {
     userId: result.user?.id || null
   }
 }
+
+// Main authentication function for Edge Functions
+export async function authenticateRequest(req: Request) {
+  const { error, user } = await verifyAuth(req)
+  
+  if (error) {
+    throw error
+  }
+  
+  if (!user) {
+    throw createErrorResponse('AUTH_REQUIRED', 'Authentication required', 401, req.headers.get("origin"))
+  }
+  
+  // Create authenticated Supabase client
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL')!,
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  )
+  
+  return { user, supabase }
+}

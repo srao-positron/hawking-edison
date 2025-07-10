@@ -219,6 +219,7 @@ export type Database = {
           created_at: string | null
           id: string
           input: string
+          metadata: Json | null
           result: Json | null
           tool_calls: Json | null
           user_id: string
@@ -228,6 +229,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           input: string
+          metadata?: Json | null
           result?: Json | null
           tool_calls?: Json | null
           user_id: string
@@ -237,6 +239,7 @@ export type Database = {
           created_at?: string | null
           id?: string
           input?: string
+          metadata?: Json | null
           result?: Json | null
           tool_calls?: Json | null
           user_id?: string

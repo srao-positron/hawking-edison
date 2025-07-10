@@ -1,5 +1,6 @@
 // API Client - Centralized API communication with auth, retries, and rate limiting
 import { getBrowserClient } from './supabase-browser'
+import { FunctionsHttpError, FunctionsRelayError, FunctionsFetchError } from '@supabase/supabase-js'
 
 export interface ApiClientConfig {
   maxRetries?: number
@@ -168,53 +169,333 @@ export const apiClient = new ApiClient()
 
 // Export specific API methods
 export const api = {
-  // Interact endpoint
+  // Interact endpoint - Call Edge Function directly
   interact: async (input: string, options?: { provider?: string; sessionId?: string }) => {
-    const response = await apiClient.post<{
-      data: { interactionId: string; threadId: string; response: string; usage?: any }
-    }>('/api/interact', { 
-      input, 
+    const supabase = getBrowserClient()
+    
+    console.log('[Interact] Calling Edge Function with:', {
+      input: input.substring(0, 100) + '...',
       provider: options?.provider,
-      context: options?.sessionId ? { sessionId: options.sessionId } : undefined
+      hasSessionId: !!options?.sessionId,
+      mode: 'sync'
     })
-    return response.data
+    
+    const { data, error } = await supabase.functions.invoke('interact', {
+      body: { 
+        input, 
+        provider: options?.provider,
+        context: options?.sessionId ? { sessionId: options.sessionId } : undefined,
+        mode: 'sync' // Use synchronous mode to get immediate responses
+      }
+    })
+    
+    if (error) {
+      if (error instanceof FunctionsHttpError) {
+        const errorMessage = await error.context.json()
+        console.error('[Interact] Edge Function HTTP error:', {
+          status: error.context.status,
+          statusText: error.context.statusText,
+          error: errorMessage,
+          headers: Object.fromEntries(error.context.headers.entries())
+        })
+        throw new Error(errorMessage.error?.message || errorMessage.message || 'Edge Function error')
+      } else if (error instanceof FunctionsRelayError) {
+        console.error('[Interact] Relay error:', error.message)
+        throw new Error(`Relay error: ${error.message}`)
+      } else if (error instanceof FunctionsFetchError) {
+        console.error('[Interact] Fetch error:', error.message)
+        throw new Error(`Fetch error: ${error.message}`)
+      }
+      console.error('[Interact] Unknown error:', error)
+      throw error
+    }
+    
+    console.log('[Interact] Edge Function response:', {
+      hasData: !!data,
+      dataKeys: data ? Object.keys(data) : [],
+      fullResponse: data
+    })
+    
+    // The Edge Function returns { success, data, metadata }
+    // We need to extract the data portion
+    if (data && data.data) {
+      return data.data
+    }
+    
+    // If there's no nested data property, return the whole response
+    if (data) {
+      console.warn('[Interact] No data.data property, returning full response')
+      return data
+    }
+    
+    throw new Error('Invalid response from Edge Function')
   },
 
-  // Chat threads endpoints
+  // Streaming interact endpoint using Server-Sent Events
+  interactStream: async (threadId: string, input: string): Promise<EventSource> => {
+    const supabase = getBrowserClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
+      throw new Error('Not authenticated')
+    }
+
+    const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/interact-stream`
+    
+    // Create EventSource with auth token in query params (SSE doesn't support headers)
+    const params = new URLSearchParams({
+      authorization: session.access_token,
+      threadId,
+      input
+    })
+
+    // For SSE, we need to send data via POST body, so we'll use a different approach
+    // First, initiate the stream with a POST request that returns a stream ID
+    const initResponse = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ threadId, input })
+    })
+
+    if (!initResponse.ok) {
+      const error = await initResponse.json()
+      throw new Error(error.error?.message || 'Failed to start streaming')
+    }
+
+    // Return the response as an EventSource-like object
+    const reader = initResponse.body?.getReader()
+    const decoder = new TextDecoder()
+
+    // Create a custom EventSource-like object
+    let readyState = 1 // OPEN
+    const eventSource = {
+      onmessage: null as ((event: MessageEvent) => void) | null,
+      onerror: null as ((event: Event) => void) | null,
+      get readyState() { return readyState },
+      url: url,
+      close: () => {
+        readyState = 2 // CLOSED
+        reader?.cancel()
+      },
+      addEventListener: (type: string, listener: EventListener) => {
+        // Simple event listener implementation
+        if (type === 'message') {
+          eventSource.onmessage = listener as any
+        } else if (type === 'error') {
+          eventSource.onerror = listener
+        } else {
+          // Store custom event listeners
+          if (!eventSource._customListeners) {
+            eventSource._customListeners = {}
+          }
+          if (!eventSource._customListeners[type]) {
+            eventSource._customListeners[type] = []
+          }
+          eventSource._customListeners[type].push(listener)
+        }
+      },
+      _customListeners: {} as Record<string, EventListener[]>
+    } as EventSource & { _customListeners: Record<string, EventListener[]> }
+
+    // Start reading the stream
+    const readStream = async () => {
+      if (!reader) return
+
+      try {
+        let buffer = ''
+        
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          
+          // Process complete SSE messages
+          const lines = buffer.split('\n')
+          buffer = lines.pop() || '' // Keep incomplete line in buffer
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              const eventType = line.slice(7).trim()
+              const nextLine = lines[lines.indexOf(line) + 1]
+              if (nextLine?.startsWith('data: ')) {
+                const data = nextLine.slice(6)
+                
+                // Dispatch custom event
+                if (eventSource._customListeners[eventType]) {
+                  const event = new MessageEvent(eventType, { data })
+                  eventSource._customListeners[eventType].forEach(listener => {
+                    listener(event)
+                  })
+                }
+              }
+            } else if (line.startsWith('data: ')) {
+              const data = line.slice(6)
+              if (eventSource.onmessage) {
+                eventSource.onmessage(new MessageEvent('message', { data }))
+              }
+            }
+          }
+        }
+      } catch (error) {
+        if (eventSource.onerror) {
+          eventSource.onerror(new Event('error'))
+        }
+      }
+    }
+
+    // Start reading in background
+    readStream()
+
+    return eventSource as EventSource
+  },
+
+  // Chat threads endpoints - Direct REST API calls since the Edge Function uses REST routing
   threads: {
     list: async (limit = 50, offset = 0) => {
-      const response = await apiClient.get<{
-        data: { threads: any[]; total: number }
-      }>(`/api/chat-threads?limit=${limit}&offset=${offset}`)
-      return response.data
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads?limit=${limit}&offset=${offset}`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to list threads')
+      }
+      
+      const result = await response.json()
+      return result.data || { threads: [], total: 0 }
     },
 
     get: async (threadId: string) => {
-      const response = await apiClient.get<{
-        data: { thread: any; messages: any[] }
-      }>(`/api/chat-threads/${threadId}`)
-      return response.data
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
+      
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to get thread')
+      }
+      
+      const result = await response.json()
+      return result.data
+    },
+
+    getMessages: async (threadId: string) => {
+      // The get endpoint already returns messages
+      const data = await api.threads.get(threadId)
+      return data?.messages || []
     },
 
     create: async (title?: string, metadata?: any) => {
-      const response = await apiClient.post<{
-        data: { thread: any }
-      }>('/api/chat-threads', { title, metadata })
-      return response.data
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads`
+      
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ title: title || 'New Chat', metadata })
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to create thread')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
 
     update: async (threadId: string, updates: { title?: string; metadata?: any }) => {
-      const response = await apiClient.put<{
-        data: { thread: any }
-      }>(`/api/chat-threads/${threadId}`, updates)
-      return response.data
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
+      
+      const response = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(updates)
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to update thread')
+      }
+      
+      const result = await response.json()
+      return result.data
     },
 
     delete: async (threadId: string) => {
-      const response = await apiClient.delete<{
-        data: {}
-      }>(`/api/chat-threads/${threadId}`)
-      return response.data
+      const supabase = getBrowserClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        throw new Error('Not authenticated')
+      }
+
+      const url = `${process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/chat-threads/${threadId}`
+      
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
+      
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: { message: 'Unknown error' } }))
+        throw new Error(error.error?.message || 'Failed to delete thread')
+      }
+      
+      const result = await response.json()
+      return result.data
     }
   },
 
@@ -281,130 +562,75 @@ export const api = {
   // API Key endpoints - Call Edge Functions directly
   apiKeys: {
     list: async () => {
-      console.log('[API Keys] Listing API keys...')
       const supabase = getBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
       
-      console.log('[API Keys] Session found:', !!session)
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
-      const url = `${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`
-      console.log('[API Keys] Edge Function URL:', url)
-      console.log('[API Keys] NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
-
-      const response = await fetch(url, {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json',
-          'Origin': window.location.origin
-        }
+      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
+        body: { action: 'list' }
       })
       
-      console.log('[API Keys] Response status:', response.status)
-      console.log('[API Keys] Response headers:', Object.fromEntries(response.headers.entries()))
-      
-      const responseText = await response.text()
-      console.log('[API Keys] Response text:', responseText)
-      
-      let responseData
-      try {
-        responseData = JSON.parse(responseText)
-      } catch (e) {
-        console.error('[API Keys] Failed to parse response:', e)
-        throw new Error('Invalid response from server')
+      if (error) {
+        if (error instanceof FunctionsHttpError) {
+          const errorMessage = await error.context.json()
+          throw new Error(errorMessage.error?.message || 'Failed to fetch API keys')
+        }
+        throw new Error(error.message || 'Failed to fetch API keys')
       }
       
-      if (!response.ok) {
-        console.error('[API Keys] Error response:', responseData)
-        throw new Error(responseData.error?.message || `Failed to fetch API keys: ${response.status}`)
-      }
-      
-      return responseData.data
+      return data?.data || []
     },
     
     create: async (name: string, expiresInDays?: number, environment: 'live' | 'test' = 'live') => {
       const supabase = getBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ name, expiresInDays, environment })
+      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
+        body: { action: 'create', name, expiresInDays, environment }
       })
       
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error?.message || 'Failed to create API key')
+      if (error) {
+        if (error instanceof FunctionsHttpError) {
+          const errorMessage = await error.context.json()
+          throw new Error(errorMessage.error?.message || 'Failed to create API key')
+        }
+        throw new Error(error.message || 'Failed to create API key')
       }
       
-      const result = await response.json()
-      return result.data
+      return data?.data
     },
     
     revoke: async (id: string) => {
       const supabase = getBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ id, action: 'revoke' })
+      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
+        body: { action: 'revoke', id }
       })
       
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error?.message || 'Failed to revoke API key')
+      if (error) {
+        if (error instanceof FunctionsHttpError) {
+          const errorMessage = await error.context.json()
+          throw new Error(errorMessage.error?.message || 'Failed to revoke API key')
+        }
+        throw new Error(error.message || 'Failed to revoke API key')
       }
       
-      const result = await response.json()
-      return result.data
+      return data?.data
     },
     
     delete: async (id: string) => {
       const supabase = getBrowserClient()
-      const { data: { session } } = await supabase.auth.getSession()
       
-      if (!session?.access_token) {
-        throw new Error('Not authenticated')
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL}/functions/v1/auth-api-keys`, {
-        method: 'DELETE',
-        credentials: 'include',
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ id })
+      const { data, error } = await supabase.functions.invoke('auth-api-keys', {
+        body: { action: 'delete', id }
       })
       
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.error?.message || 'Failed to delete API key')
+      if (error) {
+        if (error instanceof FunctionsHttpError) {
+          const errorMessage = await error.context.json()
+          throw new Error(errorMessage.error?.message || 'Failed to delete API key')
+        }
+        throw new Error(error.message || 'Failed to delete API key')
       }
       
-      const result = await response.json()
-      return result.data
+      return data?.data
     }
   }
 }

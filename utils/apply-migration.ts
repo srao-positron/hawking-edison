@@ -3,38 +3,52 @@
  * Output migration SQL for manual application via Supabase Dashboard
  */
 
-import { readFileSync } from 'fs'
+import { readFileSync, existsSync } from 'fs'
 import { resolve } from 'path'
+import chalk from 'chalk'
 
-const migrationFile = resolve(__dirname, '../supabase/migrations/20250111_thread_management.sql')
-const migrationSQL = readFileSync(migrationFile, 'utf-8')
+console.log(chalk.blue('🔧 Database Migrations Helper\n'))
 
-console.log(`
-📝 Thread Management Migration
-==============================
+// Find migration files
+const migrations = [
+  '20250710_add_interactions_metadata.sql',
+  '20250710_edge_function_logs.sql'
+].map(filename => {
+  const path = resolve(process.cwd(), 'supabase/migrations', filename)
+  if (!existsSync(path)) {
+    console.log(chalk.red(`❌ Migration file not found: ${filename}`))
+    return null
+  }
+  return {
+    filename,
+    content: readFileSync(path, 'utf-8')
+  }
+}).filter(Boolean)
 
-To apply this migration:
+if (migrations.length === 0) {
+  console.log(chalk.red('No migration files found!'))
+  process.exit(1)
+}
 
-1. Go to the Supabase SQL Editor:
-   https://supabase.com/dashboard/project/bknpldydmkzupsfagnva/sql/new
+console.log(chalk.yellow('📝 To apply these migrations:\n'))
+console.log(chalk.cyan('1. Go to the Supabase SQL Editor:'))
+console.log(`   https://supabase.com/dashboard/project/bknpldydmkzupsfagnva/sql/new\n`)
 
-2. Copy and paste the following SQL:
+console.log(chalk.cyan('2. Copy and paste the following SQL:\n'))
 
-${'-'.repeat(80)}
-${migrationSQL}
-${'-'.repeat(80)}
+migrations.forEach((migration, index) => {
+  console.log(chalk.gray(`${'='.repeat(80)}`))
+  console.log(chalk.green(`-- Migration ${index + 1}: ${migration.filename}`))
+  console.log(chalk.gray(`${'='.repeat(80)}`))
+  console.log(migration.content)
+  console.log()
+})
 
-3. Click "Run" to execute the migration
+console.log(chalk.cyan('3. Click "Run" to execute the migrations\n'))
 
-4. After successful execution, run:
-   npx tsx utils/sync-database-types.ts
+console.log(chalk.cyan('4. After successful execution, run:'))
+console.log(chalk.gray('   npx tsx utils/sync-database-types.ts\n'))
 
-5. Then continue with the implementation
-
-Note: The migration includes:
-- Thread management tables (threads, messages, etc.)
-- Visualization storage
-- RLS policies for security
-- Realtime subscriptions
-- Indexes for performance
-`)
+console.log(chalk.yellow('📌 Note about database password:'))
+console.log(chalk.gray('   The password contains special characters (@) which causes issues'))
+console.log(chalk.gray('   with connection strings. Using the SQL Editor avoids this problem.'))

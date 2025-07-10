@@ -4,6 +4,17 @@
 ### Core Principle
 **Everything is an API**. The browser is just one client. MCP is another. Future mobile apps are others.
 
+### Key Architecture Decision: Direct Edge Function Calls
+
+**We call Supabase Edge Functions directly from clients. No Next.js API route proxying.**
+
+Why?
+1. **Simpler**: One less layer to debug
+2. **Faster**: No extra hop through Next.js
+3. **Clearer errors**: See Edge Function errors directly
+4. **Better logs**: Edge Function logs are the source of truth
+5. **CORS is handled**: Supabase Edge Functions have CORS built-in
+
 ### Architecture Overview
 
 ```
@@ -242,9 +253,20 @@ const createAgentInBrowser = async (spec: string) => {
   return agent;
 };
 
-// ✅ RIGHT - Call API
+// ❌ WRONG - Proxying through Next.js API routes
+const createAgentViaProxy = async (spec: string) => {
+  // Don't proxy through /api/interact route
+  const response = await fetch('/api/interact', {
+    method: 'POST',
+    body: JSON.stringify({ input: spec })
+  });
+  return response.json();
+};
+
+// ✅ RIGHT - Call Edge Functions directly
 const createAgent = async (spec: string) => {
-  const response = await fetch('/api/tools/create-agent', {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const response = await fetch(`${supabaseUrl}/functions/v1/tools-create-agent`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${session.access_token}`,
@@ -257,22 +279,29 @@ const createAgent = async (spec: string) => {
 };
 ```
 
-#### Browser App Structure
+#### Direct Edge Function Calls - No Proxying!
+
+**IMPORTANT**: We call Supabase Edge Functions directly from the browser. No Next.js API route proxying.
+
 ```typescript
-// app/lib/api.ts - API client
+// app/lib/api.ts - API client that calls Edge Functions directly
 export class HawkingAPI {
-  constructor(private token: string) {}
+  private supabaseUrl: string;
+  
+  constructor(private token: string) {
+    this.supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  }
   
   async interact(input: string, context?: any) {
-    return this.post('/api/interact', { input, context });
+    return this.callEdgeFunction('interact', { input, context });
   }
   
   async searchDatabank(query: string) {
-    return this.get(`/api/databank/search?q=${encodeURIComponent(query)}`);
+    return this.callEdgeFunction('databank-search', { query });
   }
   
-  private async post(endpoint: string, body: any) {
-    const response = await fetch(endpoint, {
+  private async callEdgeFunction(functionName: string, body: any) {
+    const response = await fetch(`${this.supabaseUrl}/functions/v1/${functionName}`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${this.token}`,
@@ -282,7 +311,8 @@ export class HawkingAPI {
     });
     
     if (!response.ok) {
-      throw new Error(`API error: ${response.statusText}`);
+      const error = await response.json();
+      throw new Error(error.message || `Edge Function error: ${response.statusText}`);
     }
     
     return response.json();

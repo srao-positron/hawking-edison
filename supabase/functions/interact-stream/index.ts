@@ -201,8 +201,8 @@ Otherwise, respond normally to the user.`
                     .select()
                     .single()
                   
-                  // Simulate tool result
-                  const toolResult = await executeToolMock(currentTool, params, {
+                  // Execute the tool
+                  const toolResult = await executeTool(currentTool, params, {
                     supabase,
                     userId: user.id,
                     threadId: body.threadId,
@@ -289,70 +289,59 @@ Otherwise, respond normally to the user.`
   }
 })
 
-// Mock tool execution for testing
-async function executeToolMock(toolName: string, params: any, context: any) {
-  switch (toolName) {
-    case 'createAgent':
-      // Create agent conversation in sub-thread
-      const { data: agentThread } = await context.supabase
-        .from('threads')
-        .insert({
-          user_id: context.userId,
-          parent_thread_id: context.threadId,
-          name: `Agent: ${params.specification}`,
-          auto_generated_name: `Agent: ${params.specification}`
-        })
-        .select()
-        .single()
+// Import the actual tools
+import { createAgent, runDiscussion, gatherResponses, analyzeResults } from '../_shared/tools/agent.ts'
+import { createVisualization } from '../_shared/tools/visualization.ts'
 
-      await context.supabase
-        .from('agent_conversations')
-        .insert({
-          parent_thread_id: context.threadId,
-          tool_execution_id: context.toolExecutionId,
-          agent_specification: params.specification,
-          messages: [
-            { role: 'system', content: `You are: ${params.specification}` },
-            { role: 'user', content: 'Introduce yourself' },
-            { role: 'assistant', content: `Hello! I'm an agent specialized in ${params.specification}. How can I help?` }
-          ]
-        })
+// Tool registry
+const toolRegistry = {
+  createAgent,
+  runDiscussion,
+  gatherResponses,
+  analyzeResults,
+  createVisualization
+}
 
-      return {
-        agentId: `agent_${Date.now()}`,
-        specification: params.specification,
-        threadId: agentThread.id
-      }
-
-    case 'createVisualization':
-      // Create a simple SVG chart
-      const svg = `<svg width="400" height="300">
-        <rect x="50" y="50" width="100" height="150" fill="blue" />
-        <rect x="200" y="100" width="100" height="100" fill="red" />
-        <text x="100" y="250">Sample Chart</text>
-      </svg>`
-
-      const { data: viz } = await context.supabase
-        .from('visualizations')
-        .insert({
-          thread_id: context.threadId,
-          tool_execution_id: context.toolExecutionId,
-          type: params.type || 'chart',
-          content: svg,
-          generation_prompt: params.goal
-        })
-        .select()
-        .single()
-
-      return {
-        visualizationId: viz.id,
-        type: viz.type,
-        preview: 'Chart generated successfully'
-      }
-
-    default:
-      return {
-        message: `Tool ${toolName} executed with params: ${JSON.stringify(params)}`
-      }
+// Execute tool with proper context
+async function executeTool(toolName: string, params: any, context: any) {
+  const tool = toolRegistry[toolName as keyof typeof toolRegistry]
+  
+  if (!tool) {
+    throw new Error(`Unknown tool: ${toolName}`)
   }
+
+  // Execute the tool
+  const result = await tool.execute(params, context)
+  
+  // For agent creation, ensure sub-thread is created
+  if (toolName === 'createAgent' && result.agentId) {
+    // Create a sub-thread for this agent
+    const { data: agentThread } = await context.supabase
+      .from('threads')
+      .insert({
+        user_id: context.userId,
+        parent_thread_id: context.threadId,
+        name: `Agent: ${params.specification}`,
+        auto_generated_name: `Agent: ${params.specification}`
+      })
+      .select()
+      .single()
+
+    // Store agent conversation
+    await context.supabase
+      .from('agent_conversations')
+      .insert({
+        parent_thread_id: context.threadId,
+        tool_execution_id: context.toolExecutionId,
+        agent_specification: params.specification,
+        messages: result.messages || []
+      })
+
+    return {
+      ...result,
+      threadId: agentThread.id
+    }
+  }
+
+  return result
 }

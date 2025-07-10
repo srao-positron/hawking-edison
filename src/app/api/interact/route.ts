@@ -35,6 +35,13 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // The Edge Function already returns { success, data, metadata }
+    // We need to extract the data portion
+    if (data && data.data) {
+      return NextResponse.json({ data: data.data })
+    }
+
+    // Fallback if structure is different
     return NextResponse.json({ data })
   } catch (error) {
     console.error('API route error:', error)
