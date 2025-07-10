@@ -39,6 +39,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-sns": "^3.840.0",
+    "@dqbd/tiktoken": "^1.0.21",
     "@mantine/core": "^8.1.2",
     "@mantine/dates": "^8.1.2",
     "@mantine/form": "^8.1.2",
