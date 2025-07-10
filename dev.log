@@ -25,3 +25,29 @@
  GET /chat 200 in 57ms
  ✓ Compiled in 295ms (3328 modules)
  GET /chat 200 in 35ms
+ ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
+ ✓ Compiled in 672ms (3328 modules)
+ ⨯ [Error: Attempted to call generateViewport() from the server but generateViewport is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.] {
+  digest: '1885803959'
+}
+ ⨯ [Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.] {
+  digest: '3052987909'
+}
+ GET /chat 500 in 439ms
+ ⨯ [Error: Attempted to call generateViewport() from the server but generateViewport is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.] {
+  digest: '1885803959'
+}
+ GET /chat 200 in 144ms
+ ✓ Compiled /_not-found in 301ms (3318 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 359ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 21ms
+ ✓ Compiled in 432ms (3332 modules)
+ ⚠ Fast Refresh had to perform a full reload due to a runtime error.
+ GET /chat 200 in 119ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 27ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 20ms
+ ✓ Compiled in 224ms (3318 modules)
+ ✓ Compiled in 594ms (3314 modules)
+   Reload env: .env.local
+ ✓ Compiled in 506ms (3494 modules)
+ GET /chat 200 in 55ms

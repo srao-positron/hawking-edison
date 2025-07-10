@@ -1,6 +1,5 @@
 import { CloudFormationCustomResourceHandler, CloudFormationCustomResourceEvent, CloudFormationCustomResourceResponse } from 'aws-lambda'
 import { SecretsManagerClient, GetSecretValueCommand } from '@aws-sdk/client-secrets-manager'
-import { createClient } from '@supabase/supabase-js'
 import * as https from 'https'
 import { URL } from 'url'
 
@@ -74,32 +73,34 @@ export const handler: CloudFormationCustomResourceHandler = async (event, contex
       const secretData = JSON.parse(secretResponse.SecretString || '{}')
       const SecretAccessKey = secretData.secretAccessKey
       
-      // Create Supabase client
-      const supabase = createClient(SupabaseUrl, SupabaseServiceRoleKey)
+      // Call Edge Function to store credentials
+      console.log('Calling Edge Function to store AWS credentials in Vault...')
       
-      // Store credentials in Vault
-      console.log('Storing AWS credentials in Supabase Vault...')
-      const { error } = await supabase.rpc('store_aws_credentials', {
-        p_access_key_id: AccessKeyId,
-        p_secret_access_key: SecretAccessKey,
-        p_region: Region,
-        p_topic_arn: TopicArn
+      const edgeFunctionUrl = `${SupabaseUrl}/functions/v1/vault-store`
+      const vaultStoreServiceKey = process.env.VAULT_STORE_SERVICE_KEY || SupabaseServiceRoleKey
+      
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-service-key': vaultStoreServiceKey,
+        },
+        body: JSON.stringify({
+          accessKeyId: AccessKeyId,
+          secretAccessKey: SecretAccessKey,
+          region: Region,
+          topicArn: TopicArn,
+        }),
       })
       
-      if (error) {
-        throw new Error(`Failed to store credentials in Vault: ${error.message}`)
+      const result = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(`Edge Function failed: ${result.error || response.statusText}`)
       }
       
-      console.log('Successfully stored AWS credentials in Vault')
-      
-      // Verify storage
-      const { data: verifyData, error: verifyError } = await supabase.rpc('get_aws_credentials')
-      
-      if (verifyError) {
-        console.warn('Could not verify credentials:', verifyError.message)
-      } else if (verifyData) {
-        console.log('Credentials verified successfully')
-      }
+      console.log('Successfully stored AWS credentials in Vault via Edge Function')
+      console.log('Result:', result)
       
       await sendResponse(event, context, 'SUCCESS', {
         Success: true,

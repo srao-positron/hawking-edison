@@ -29,10 +29,18 @@ export function createClient() {
     {
       cookies: {
         get(name: string) {
+          // Check if we're in the browser
+          if (typeof document === 'undefined') {
+            return undefined
+          }
           const cookies = parseCookieString(document.cookie)
           return cookies[name]
         },
         set(name: string, value: string, options?: any) {
+          // Check if we're in the browser
+          if (typeof document === 'undefined') {
+            return
+          }
           let cookieString = `${name}=${value}`
           
           if (options?.maxAge) {
@@ -48,6 +56,10 @@ export function createClient() {
           document.cookie = cookieString
         },
         remove(name: string) {
+          // Check if we're in the browser
+          if (typeof document === 'undefined') {
+            return
+          }
           document.cookie = `${name}=; Max-Age=0; Path=/`
         }
       }

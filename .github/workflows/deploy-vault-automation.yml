@@ -1,0 +1,67 @@
+name: Deploy Vault Automation
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'supabase/functions/vault-store/**'
+      - 'infrastructure/cdk/**'
+      - '.github/workflows/deploy-vault-automation.yml'
+
+jobs:
+  deploy-edge-function:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Install Supabase CLI
+        run: |
+          wget -qO- https://github.com/supabase/cli/releases/download/v1.123.4/supabase_linux_amd64.tar.gz | tar xvz
+          sudo mv supabase /usr/local/bin
+          
+      - name: Deploy vault-store Edge Function
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          VAULT_STORE_SERVICE_KEY: ${{ secrets.VAULT_STORE_SERVICE_KEY }}
+        run: |
+          # Set the secret first
+          supabase secrets set VAULT_STORE_SERVICE_KEY="${VAULT_STORE_SERVICE_KEY}"
+          
+          # Deploy the function
+          supabase functions deploy vault-store --no-verify-jwt
+          
+  deploy-cdk:
+    needs: deploy-edge-function
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+          
+      - name: Install dependencies
+        working-directory: infrastructure/cdk
+        run: npm ci
+        
+      - name: Deploy CDK stack
+        working-directory: infrastructure/cdk
+        env:
+          SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VAULT_STORE_SERVICE_KEY: ${{ secrets.VAULT_STORE_SERVICE_KEY }}
+        run: |
+          npx cdk deploy --require-approval never

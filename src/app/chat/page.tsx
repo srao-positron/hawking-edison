@@ -1,13 +1,13 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import ChatInterface from '@/components/ChatInterface'
 import Sidebar from '@/components/Sidebar'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
 import { api } from '@/lib/api-client'
 
-export default function ChatPage() {
+function ChatPageContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -88,5 +88,17 @@ export default function ChatPage() {
         />
       </div>
     </div>
+  )
+}
+
+export default function ChatPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-gray-500">Loading...</div>
+      </div>
+    }>
+      <ChatPageContent />
+    </Suspense>
   )
 }

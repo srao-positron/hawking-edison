@@ -1,0 +1,105 @@
+Bundling asset HawkingEdisonStack-dev/Orchestrator/Code/Stage...
+
+  ...09d71cc0a7c4882501c8cedd80b41512cf3b9b7d525454-building/index.js  2.7mb ⚠️
+  ...1cc0a7c4882501c8cedd80b41512cf3b9b7d525454-building/index.js.map  4.4mb
+
+⚡ Done in 881ms
+Bundling asset HawkingEdisonStack-dev/VaultCredentialManager/Code/Stage...
+
+  ...b50fdada98b6641f224a7400f41f439b9b134680a462b3-building/index.js  1.7mb ⚠️
+  ...dada98b6641f224a7400f41f439b9b134680a462b3-building/index.js.map  2.9mb
+
+⚡ Done in 79ms
+Bundling asset HawkingEdisonStack-dev/OrchestrationResumption/Code/Stage...
+
+  ...82e3b2c85eb741d1ec40bfb1d0b9ee8b008575ee469cad-building/index.js  1.9mb ⚠️
+  ...b2c85eb741d1ec40bfb1d0b9ee8b008575ee469cad-building/index.js.map  3.2mb
+
+⚡ Done in 79ms
+
+✨  Synthesis time: 5.72s
+
+hawking-edison-dev: start: Building hawking-edison-dev Template
+hawking-edison-dev: success: Built hawking-edison-dev Template
+hawking-edison-dev: start: Publishing hawking-edison-dev Template (600771336675-us-east-2)
+hawking-edison-dev: success: Published hawking-edison-dev Template (600771336675-us-east-2)
+HawkingEdisonStack-dev (hawking-edison-dev): deploying... [1/1]
+hawking-edison-dev: creating CloudFormation changeset...
+hawking-edison-dev |  0/13 | 1:18:45 AM | UPDATE_IN_PROGRESS   | AWS::CloudFormation::Stack          | hawking-edison-dev User Initiated
+hawking-edison-dev |  0/13 | 1:18:48 AM | CREATE_IN_PROGRESS   | AWS::IAM::Role                      | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole (VaultCredentialManagerServiceRole04B32A3A) 
+hawking-edison-dev |  0/13 | 1:18:48 AM | UPDATE_IN_PROGRESS   | AWS::CDK::Metadata                  | HawkingEdisonStack-dev/CDKMetadata/Default (CDKMetadata) 
+hawking-edison-dev |  0/13 | 1:18:48 AM | UPDATE_IN_PROGRESS   | AWS::IAM::User                      | HawkingEdisonStack-dev/EdgeFunctionUser (EdgeFunctionUser71F715A1) Requested update requires the creation of a new physical resource; hence creating one.
+hawking-edison-dev |  0/13 | 1:18:49 AM | CREATE_IN_PROGRESS   | AWS::IAM::Role                      | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole (VaultCredentialManagerServiceRole04B32A3A) Resource creation Initiated
+hawking-edison-dev |  0/13 | 1:18:49 AM | UPDATE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/Orchestrator (Orchestrator6EF1216F) 
+hawking-edison-dev |  0/13 | 1:18:49 AM | UPDATE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/OrchestrationResumption (OrchestrationResumptionD824BE34) 
+hawking-edison-dev |  1/13 | 1:18:49 AM | UPDATE_COMPLETE      | AWS::CDK::Metadata                  | HawkingEdisonStack-dev/CDKMetadata/Default (CDKMetadata) 
+hawking-edison-dev |  1/13 | 1:18:49 AM | UPDATE_IN_PROGRESS   | AWS::IAM::User                      | HawkingEdisonStack-dev/EdgeFunctionUser (EdgeFunctionUser71F715A1) Resource creation Initiated
+hawking-edison-dev |  2/13 | 1:18:56 AM | UPDATE_COMPLETE      | AWS::Lambda::Function               | HawkingEdisonStack-dev/OrchestrationResumption (OrchestrationResumptionD824BE34) 
+hawking-edison-dev |  3/13 | 1:18:56 AM | UPDATE_COMPLETE      | AWS::Lambda::Function               | HawkingEdisonStack-dev/Orchestrator (Orchestrator6EF1216F) 
+hawking-edison-dev |  4/13 | 1:19:05 AM | CREATE_COMPLETE      | AWS::IAM::Role                      | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole (VaultCredentialManagerServiceRole04B32A3A) 
+hawking-edison-dev |  5/13 | 1:19:26 AM | UPDATE_COMPLETE      | AWS::IAM::User                      | HawkingEdisonStack-dev/EdgeFunctionUser (EdgeFunctionUser71F715A1) 
+hawking-edison-dev |  5/13 | 1:19:27 AM | UPDATE_IN_PROGRESS   | AWS::IAM::Policy                    | HawkingEdisonStack-dev/EdgeFunctionUser/DefaultPolicy (EdgeFunctionUserDefaultPolicy39C770E7) 
+hawking-edison-dev |  5/13 | 1:19:27 AM | UPDATE_IN_PROGRESS   | AWS::IAM::AccessKey                 | HawkingEdisonStack-dev/EdgeFunctionAccessKey (EdgeFunctionAccessKey0496A327) Requested update requires the creation of a new physical resource; hence creating one.
+hawking-edison-dev |  5/13 | 1:19:28 AM | UPDATE_IN_PROGRESS   | AWS::IAM::AccessKey                 | HawkingEdisonStack-dev/EdgeFunctionAccessKey (EdgeFunctionAccessKey0496A327) Resource creation Initiated
+hawking-edison-dev |  6/13 | 1:19:28 AM | UPDATE_COMPLETE      | AWS::IAM::AccessKey                 | HawkingEdisonStack-dev/EdgeFunctionAccessKey (EdgeFunctionAccessKey0496A327) 
+hawking-edison-dev |  6/13 | 1:19:29 AM | UPDATE_IN_PROGRESS   | AWS::SecretsManager::Secret         | HawkingEdisonStack-dev/EdgeFunctionCreds (EdgeFunctionCredsC9C0DD4C) 
+hawking-edison-dev |  7/13 | 1:19:30 AM | UPDATE_COMPLETE      | AWS::SecretsManager::Secret         | HawkingEdisonStack-dev/EdgeFunctionCreds (EdgeFunctionCredsC9C0DD4C) 
+hawking-edison-dev |  7/13 | 1:19:30 AM | CREATE_IN_PROGRESS   | AWS::IAM::Policy                    | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole/DefaultPolicy (VaultCredentialManagerServiceRoleDefaultPolicy50415216) 
+hawking-edison-dev |  7/13 | 1:19:32 AM | CREATE_IN_PROGRESS   | AWS::IAM::Policy                    | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole/DefaultPolicy (VaultCredentialManagerServiceRoleDefaultPolicy50415216) Resource creation Initiated
+hawking-edison-dev |  8/13 | 1:19:43 AM | UPDATE_COMPLETE      | AWS::IAM::Policy                    | HawkingEdisonStack-dev/EdgeFunctionUser/DefaultPolicy (EdgeFunctionUserDefaultPolicy39C770E7) 
+hawking-edison-dev |  9/13 | 1:19:47 AM | CREATE_COMPLETE      | AWS::IAM::Policy                    | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole/DefaultPolicy (VaultCredentialManagerServiceRoleDefaultPolicy50415216) 
+hawking-edison-dev |  9/13 | 1:19:48 AM | CREATE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/VaultCredentialManager (VaultCredentialManagerA873E897) 
+hawking-edison-dev |  9/13 | 1:19:49 AM | CREATE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/VaultCredentialManager (VaultCredentialManagerA873E897) Resource creation Initiated
+hawking-edison-dev | 10/13 | 1:19:55 AM | CREATE_COMPLETE      | AWS::Lambda::Function               | HawkingEdisonStack-dev/VaultCredentialManager (VaultCredentialManagerA873E897) 
+hawking-edison-dev | 10/13 | 1:19:56 AM | CREATE_IN_PROGRESS   | AWS::CloudFormation::CustomResource | HawkingEdisonStack-dev/StoreCredsInVault/Default (StoreCredsInVault) 
+hawking-edison-dev | 10/13 | 1:20:03 AM | CREATE_IN_PROGRESS   | AWS::CloudFormation::CustomResource | HawkingEdisonStack-dev/StoreCredsInVault/Default (StoreCredsInVault) Resource creation Initiated
+hawking-edison-dev | 10/13 | 1:20:03 AM | CREATE_FAILED        | AWS::CloudFormation::CustomResource | HawkingEdisonStack-dev/StoreCredsInVault/Default (StoreCredsInVault) Received response status [FAILED] from custom resource. Message returned: See the details in CloudWatch Log Stream: 2025/07/09/[$LATEST]2ed4d38f375644f9aa67526d76b1fa64 (RequestId: 0b5fc659-1d62-408d-b574-ee0b4e92bd54)
+hawking-edison-dev | 10/13 | 1:20:03 AM | UPDATE_ROLLBACK_IN_P | AWS::CloudFormation::Stack          | hawking-edison-dev The following resource(s) failed to create: [StoreCredsInVault]. 
+hawking-edison-dev | 10/13 | 1:20:05 AM | UPDATE_IN_PROGRESS   | AWS::CDK::Metadata                  | HawkingEdisonStack-dev/CDKMetadata/Default (CDKMetadata) 
+hawking-edison-dev | 10/13 | 1:20:05 AM | UPDATE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/OrchestrationResumption (OrchestrationResumptionD824BE34) 
+hawking-edison-dev |  9/13 | 1:20:05 AM | UPDATE_COMPLETE      | AWS::IAM::User                      | HawkingEdisonStack-dev/EdgeFunctionUser (EdgeFunctionUser71F715A1) 
+hawking-edison-dev |  9/13 | 1:20:06 AM | UPDATE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/Orchestrator (Orchestrator6EF1216F) 
+hawking-edison-dev |  8/13 | 1:20:06 AM | UPDATE_COMPLETE      | AWS::IAM::AccessKey                 | HawkingEdisonStack-dev/EdgeFunctionAccessKey (EdgeFunctionAccessKey0496A327) 
+hawking-edison-dev |  8/13 | 1:20:06 AM | UPDATE_IN_PROGRESS   | AWS::IAM::Policy                    | HawkingEdisonStack-dev/EdgeFunctionUser/DefaultPolicy (EdgeFunctionUserDefaultPolicy39C770E7) 
+hawking-edison-dev |  7/13 | 1:20:06 AM | UPDATE_COMPLETE      | AWS::CDK::Metadata                  | HawkingEdisonStack-dev/CDKMetadata/Default (CDKMetadata) 
+hawking-edison-dev |  7/13 | 1:20:06 AM | UPDATE_IN_PROGRESS   | AWS::SecretsManager::Secret         | HawkingEdisonStack-dev/EdgeFunctionCreds (EdgeFunctionCredsC9C0DD4C) 
+hawking-edison-dev |  6/13 | 1:20:07 AM | UPDATE_COMPLETE      | AWS::SecretsManager::Secret         | HawkingEdisonStack-dev/EdgeFunctionCreds (EdgeFunctionCredsC9C0DD4C) 
+hawking-edison-dev |  5/13 | 1:20:13 AM | UPDATE_COMPLETE      | AWS::Lambda::Function               | HawkingEdisonStack-dev/OrchestrationResumption (OrchestrationResumptionD824BE34) 
+hawking-edison-dev |  4/13 | 1:20:13 AM | UPDATE_COMPLETE      | AWS::Lambda::Function               | HawkingEdisonStack-dev/Orchestrator (Orchestrator6EF1216F) 
+hawking-edison-dev |  3/13 | 1:20:22 AM | UPDATE_COMPLETE      | AWS::IAM::Policy                    | HawkingEdisonStack-dev/EdgeFunctionUser/DefaultPolicy (EdgeFunctionUserDefaultPolicy39C770E7) 
+hawking-edison-dev |  4/13 | 1:20:22 AM | UPDATE_ROLLBACK_COMP | AWS::CloudFormation::Stack          | hawking-edison-dev 
+hawking-edison-dev |  4/13 | 1:20:23 AM | DELETE_IN_PROGRESS   | AWS::CloudFormation::CustomResource | HawkingEdisonStack-dev/StoreCredsInVault/Default (StoreCredsInVault) 
+hawking-edison-dev |  5/13 | 1:20:25 AM | DELETE_COMPLETE      | AWS::CloudFormation::CustomResource | HawkingEdisonStack-dev/StoreCredsInVault/Default (StoreCredsInVault) 
+hawking-edison-dev |  5/13 | 1:20:25 AM | DELETE_IN_PROGRESS   | AWS::Lambda::Function               | HawkingEdisonStack-dev/VaultCredentialManager (VaultCredentialManagerA873E897) 
+hawking-edison-dev |  4/13 | 1:20:28 AM | DELETE_COMPLETE      | AWS::Lambda::Function               | HawkingEdisonStack-dev/VaultCredentialManager (VaultCredentialManagerA873E897) 
+hawking-edison-dev |  4/13 | 1:20:29 AM | DELETE_IN_PROGRESS   | AWS::IAM::AccessKey                 | HawkingEdisonStack-dev/EdgeFunctionAccessKey (EdgeFunctionAccessKey0496A327) 
+hawking-edison-dev |  4/13 | 1:20:29 AM | DELETE_IN_PROGRESS   | AWS::IAM::Policy                    | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole/DefaultPolicy (VaultCredentialManagerServiceRoleDefaultPolicy50415216) 
+hawking-edison-dev |  3/13 | 1:20:29 AM | DELETE_COMPLETE      | AWS::IAM::AccessKey                 | HawkingEdisonStack-dev/EdgeFunctionAccessKey (EdgeFunctionAccessKey0496A327) 
+hawking-edison-dev |  3/13 | 1:20:29 AM | DELETE_IN_PROGRESS   | AWS::IAM::User                      | HawkingEdisonStack-dev/EdgeFunctionUser (EdgeFunctionUser71F715A1) 
+hawking-edison-dev |  2/13 | 1:20:30 AM | DELETE_COMPLETE      | AWS::IAM::Policy                    | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole/DefaultPolicy (VaultCredentialManagerServiceRoleDefaultPolicy50415216) 
+hawking-edison-dev |  2/13 | 1:20:30 AM | DELETE_IN_PROGRESS   | AWS::IAM::Role                      | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole (VaultCredentialManagerServiceRole04B32A3A) 
+hawking-edison-dev |  1/13 | 1:20:40 AM | DELETE_COMPLETE      | AWS::IAM::Role                      | HawkingEdisonStack-dev/VaultCredentialManager/ServiceRole (VaultCredentialManagerServiceRole04B32A3A) 
+hawking-edison-dev |  0/13 | 1:21:05 AM | DELETE_COMPLETE      | AWS::IAM::User                      | HawkingEdisonStack-dev/EdgeFunctionUser (EdgeFunctionUser71F715A1) 
+hawking-edison-dev |  1/13 | 1:21:06 AM | UPDATE_ROLLBACK_COMP | AWS::CloudFormation::Stack          | hawking-edison-dev 
+
+Failed resources:
+hawking-edison-dev | 1:20:03 AM | CREATE_FAILED        | AWS::CloudFormation::CustomResource | HawkingEdisonStack-dev/StoreCredsInVault/Default (StoreCredsInVault) Received response status [FAILED] from custom resource. Message returned: See the details in CloudWatch Log Stream: 2025/07/09/[$LATEST]2ed4d38f375644f9aa67526d76b1fa64 (RequestId: 0b5fc659-1d62-408d-b574-ee0b4e92bd54)
+
+NOTICES         (What's this? https://github.com/aws/aws-cdk/wiki/CLI-Notices)
+
+34892	CDK CLI will collect telemetry data on command usage starting at version 2.1100.0 (unless opted out)
+
+	Overview: We do not collect customer content and we anonymize the
+	          telemetry we do collect. See the attached issue for more
+	          information on what data is collected, why, and how to
+	          opt-out. Telemetry will NOT be collected for any CDK CLI
+	          version prior to version 2.1100.0 - regardless of
+	          opt-in/out.
+
+	Affected versions: cli: ^2.0.0
+
+	More information at: https://github.com/aws/aws-cdk/issues/34892
+
+
+If you don’t want to see a notice anymore, use "cdk acknowledge <id>". For example, "cdk acknowledge 34892".
+❌  hawking-edison-dev failed: _ToolkitError: The stack named hawking-edison-dev failed to deploy: UPDATE_ROLLBACK_COMPLETE: Received response status [FAILED] from custom resource. Message returned: See the details in CloudWatch Log Stream: 2025/07/09/[$LATEST]2ed4d38f375644f9aa67526d76b1fa64 (RequestId: 0b5fc659-1d62-408d-b574-ee0b4e92bd54)
