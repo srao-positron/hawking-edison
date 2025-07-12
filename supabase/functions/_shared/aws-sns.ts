@@ -12,51 +12,51 @@ interface SNSConfig {
 // Cache config for the lifetime of the function instance
 let cachedConfig: SNSConfig | null = null
 
-// Get SNS configuration from Vault first, then fall back to environment
+// Get SNS configuration - credentials from env, topic ARN from database
 export async function getSNSConfig(): Promise<SNSConfig | null> {
   // Return cached config if available
   if (cachedConfig) return cachedConfig
 
+  // Get credentials from environment variables (stable IAM user)
+  const accessKeyId = Deno.env.get('AWS_ACCESS_KEY_ID')
+  const secretAccessKey = Deno.env.get('AWS_SECRET_ACCESS_KEY')
+  const region = Deno.env.get('AWS_REGION') || 'us-east-2'
+  
+  if (!accessKeyId || !secretAccessKey) {
+    console.error('AWS credentials not found in environment variables')
+    return null
+  }
+
+  // Get topic ARN from database (updated by CDK)
+  let topicArn = Deno.env.get('AWS_SNS_TOPIC_ARN') // Fallback
+  
   try {
-    // Try to get credentials from Vault first
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (supabaseUrl && supabaseServiceKey) {
       const supabase = createClient(supabaseUrl, supabaseServiceKey)
       
-      // Call the function to get AWS credentials
+      // Get topic ARN from database (CDK updates this)
       const { data, error } = await supabase.rpc('get_aws_credentials')
       
-      if (!error && data) {
-        console.log('Retrieved AWS credentials from Vault')
-        cachedConfig = {
-          accessKeyId: data.accessKeyId,
-          secretAccessKey: data.secretAccessKey,
-          region: data.region,
-          topicArn: data.topicArn
-        }
-        return cachedConfig
+      if (!error && data && data.topicArn) {
+        console.log('Retrieved topic ARN from database:', data.topicArn)
+        topicArn = data.topicArn
       } else if (error) {
-        console.warn('Failed to retrieve credentials from Vault:', error.message)
+        console.warn('Failed to retrieve topic ARN from database:', error.message)
       }
     }
   } catch (error) {
-    console.warn('Error accessing Vault:', error)
+    console.warn('Error accessing database for topic ARN:', error)
   }
 
-  // Fall back to environment variables
-  const accessKeyId = Deno.env.get('AWS_ACCESS_KEY_ID')
-  const secretAccessKey = Deno.env.get('AWS_SECRET_ACCESS_KEY')
-  const region = Deno.env.get('AWS_REGION') || 'us-east-1'
-  const topicArn = Deno.env.get('AWS_SNS_TOPIC_ARN')
-
-  if (!accessKeyId || !secretAccessKey || !topicArn) {
-    console.error('No AWS configuration found in Vault or environment')
+  if (!topicArn) {
+    console.error('No SNS topic ARN found')
     return null
   }
 
-  console.log('Using AWS credentials from environment variables')
+  console.log('Using AWS credentials from environment, topic ARN from database')
   cachedConfig = {
     accessKeyId,
     secretAccessKey,

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "camille": {
+      "transport": "pipe",
+      "pipeName": "/var/folders/1p/4mmnmlzx49ddr4h_qq9wdqx00000gn/T/camille-mcp.sock"
+    }
+  }
+}

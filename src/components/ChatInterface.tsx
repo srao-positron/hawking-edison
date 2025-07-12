@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, Paperclip, Sparkles } from 'lucide-react'
 import { api } from '@/lib/api-client'
+import { getBrowserClient } from '@/lib/supabase-browser'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 
@@ -124,75 +125,91 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         }
         setMessages(prev => [...prev, thinkingMessage])
         
-        // Connect to SSE stream for real-time updates
-        const edgeFunctionsUrl = process.env.NEXT_PUBLIC_EDGE_FUNCTIONS_URL || process.env.NEXT_PUBLIC_SUPABASE_URL
-        const eventSource = new EventSource(
-          `${edgeFunctionsUrl}/functions/v1/stream?sessionId=${response.sessionId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${(await api.getSession())?.access_token}`
+        // Use Supabase Realtime to subscribe to orchestration updates
+        const supabase = getBrowserClient()
+        const channel = supabase
+          .channel(`orchestration:${response.sessionId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: 'UPDATE',
+              schema: 'public',
+              table: 'orchestration_sessions',
+              filter: `id=eq.${response.sessionId}`
+            },
+            (payload) => {
+              console.log('Orchestration update:', payload)
+              const session = payload.new as any
+              
+              if (session.status === 'completed' && session.final_response) {
+                try {
+                  const finalResponse = JSON.parse(session.final_response)
+                  // Update the thinking message with the actual response
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === response.sessionId
+                      ? { 
+                          ...msg, 
+                          content: finalResponse.content || finalResponse,
+                          timestamp: new Date()
+                        }
+                      : msg
+                  ))
+                } catch (e) {
+                  // If parsing fails, use the raw response
+                  setMessages(prev => prev.map(msg => 
+                    msg.id === response.sessionId
+                      ? { 
+                          ...msg, 
+                          content: session.final_response,
+                          timestamp: new Date()
+                        }
+                      : msg
+                  ))
+                }
+                channel.unsubscribe()
+                setIsLoading(false)
+              } else if (session.status === 'failed') {
+                // Handle error
+                setMessages(prev => prev.map(msg => 
+                  msg.id === response.sessionId
+                    ? { 
+                        ...msg, 
+                        content: session.error || 'An error occurred processing your request.',
+                        error: true,
+                        timestamp: new Date()
+                      }
+                    : msg
+                ))
+                channel.unsubscribe()
+                setIsLoading(false)
+              } else if (session.status === 'running') {
+                // Update status to show it's being processed
+                setMessages(prev => prev.map(msg => 
+                  msg.id === response.sessionId
+                    ? { ...msg, content: '⚡ Processing...' }
+                    : msg
+                ))
+              }
             }
-          } as any
-        )
+          )
+          .subscribe()
         
-        eventSource.onmessage = (event) => {
-          const data = JSON.parse(event.data)
-          
-          if (data.type === 'status') {
-            // Update thinking message with progress
-            setMessages(prev => prev.map(msg => 
-              msg.id === response.sessionId
-                ? { ...msg, content: `🤔 ${data.status === 'processing' ? 'Thinking' : 'Processing'}...${data.progress ? ` (${data.progress}%)` : ''}` }
-                : msg
-            ))
-          } else if (data.type === 'result') {
-            // Replace thinking message with actual response
-            setMessages(prev => prev.map(msg => 
-              msg.id === response.sessionId
-                ? { 
-                    ...msg, 
-                    content: data.content,
-                    tokens: data.usage?.totalTokens,
-                    timestamp: new Date()
-                  }
-                : msg
-            ))
-            eventSource.close()
-            setIsLoading(false)
-          } else if (data.type === 'error') {
-            // Replace thinking message with error
-            setMessages(prev => prev.map(msg => 
-              msg.id === response.sessionId
-                ? { 
-                    ...msg, 
-                    content: 'I apologize, but I encountered an error processing your request. Please try again.',
-                    error: true,
-                    timestamp: new Date()
-                  }
-                : msg
-            ))
-            eventSource.close()
-            setIsLoading(false)
-          }
-        }
-        
-        eventSource.onerror = (error) => {
-          console.error('SSE error:', error)
-          eventSource.close()
-          
-          // Update message to show error
+        // Store channel reference for cleanup
+        const timeoutId = setTimeout(() => {
+          // Timeout after 5 minutes
+          channel.unsubscribe()
           setMessages(prev => prev.map(msg => 
             msg.id === response.sessionId
               ? { 
                   ...msg, 
-                  content: 'Connection lost. Please try again.',
+                  content: 'Request timed out. Please try again.',
                   error: true,
                   timestamp: new Date()
                 }
               : msg
           ))
           setIsLoading(false)
-        }
+        }, 5 * 60 * 1000)
       } else {
         // Sync response (shouldn't happen anymore)
         const assistantMessage: Message = {
