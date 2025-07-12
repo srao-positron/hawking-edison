@@ -114,10 +114,12 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       }
       
       // Check if this is an async response (status: 'processing' indicates async)
-      if ((response.async || response.status === 'processing') && response.sessionId) {
+      // The Edge Function returns { success: true, data: { sessionId, status, ... } }
+      const responseData = response.data || response
+      if ((responseData.async || responseData.status === 'processing') && responseData.sessionId) {
         // Create a placeholder message with thinking indicator
         const thinkingMessage: Message = {
-          id: response.sessionId,
+          id: responseData.sessionId,
           role: 'assistant',
           content: '🤔 Thinking...',
           timestamp: new Date(),
@@ -128,14 +130,14 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         // Use Supabase Realtime to subscribe to orchestration updates
         const supabase = getBrowserClient()
         const channel = supabase
-          .channel(`orchestration:${response.sessionId}`)
+          .channel(`orchestration:${responseData.sessionId}`)
           .on(
             'postgres_changes',
             {
               event: 'UPDATE',
               schema: 'public',
               table: 'orchestration_sessions',
-              filter: `id=eq.${response.sessionId}`
+              filter: `id=eq.${responseData.sessionId}`
             },
             (payload) => {
               console.log('Orchestration update:', payload)
@@ -146,7 +148,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                   const finalResponse = JSON.parse(session.final_response)
                   // Update the thinking message with the actual response
                   setMessages(prev => prev.map(msg => 
-                    msg.id === response.sessionId
+                    msg.id === responseData.sessionId
                       ? { 
                           ...msg, 
                           content: finalResponse.content || finalResponse,
@@ -157,7 +159,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                 } catch (e) {
                   // If parsing fails, use the raw response
                   setMessages(prev => prev.map(msg => 
-                    msg.id === response.sessionId
+                    msg.id === responseData.sessionId
                       ? { 
                           ...msg, 
                           content: session.final_response,
@@ -171,7 +173,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
               } else if (session.status === 'failed') {
                 // Handle error
                 setMessages(prev => prev.map(msg => 
-                  msg.id === response.sessionId
+                  msg.id === responseData.sessionId
                     ? { 
                         ...msg, 
                         content: session.error || 'An error occurred processing your request.',
@@ -185,7 +187,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
               } else if (session.status === 'running') {
                 // Update status to show it's being processed
                 setMessages(prev => prev.map(msg => 
-                  msg.id === response.sessionId
+                  msg.id === responseData.sessionId
                     ? { ...msg, content: '⚡ Processing...' }
                     : msg
                 ))
@@ -199,7 +201,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
           // Timeout after 5 minutes
           channel.unsubscribe()
           setMessages(prev => prev.map(msg => 
-            msg.id === response.sessionId
+            msg.id === responseData.sessionId
               ? { 
                   ...msg, 
                   content: 'Request timed out. Please try again.',
