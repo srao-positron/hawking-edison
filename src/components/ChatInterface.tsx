@@ -6,6 +6,7 @@ import { api } from '@/lib/api-client'
 import { getBrowserClient } from '@/lib/supabase-browser'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import OrchestrationSteps from './OrchestrationSteps'
 
 interface Message {
   id: string
@@ -14,6 +15,7 @@ interface Message {
   timestamp: Date
   tokens?: number
   error?: boolean
+  orchestrationSessionId?: string // Track which orchestration session this message belongs to
 }
 
 interface ChatInterfaceProps {
@@ -62,7 +64,8 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
           role: msg.role,
           content: msg.content,
           timestamp: new Date(msg.created_at),
-          tokens: msg.tokens_used
+          tokens: msg.tokens_used,
+          orchestrationSessionId: msg.metadata?.orchestration_session_id
         })))
       }
     } catch (error) {
@@ -106,10 +109,18 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         sessionId: sessionId || undefined 
       })
       
-      console.log('API Response:', response) // Debug log
+      console.log('[ChatInterface] API Response:', {
+        hasData: !!response.data,
+        isNewThread: response.isNewThread,
+        threadId: response.threadId,
+        sessionId: response.sessionId || response.data?.sessionId,
+        status: response.status || response.data?.status,
+        async: response.async || response.data?.async
+      })
       
       // If a new thread was created, notify parent
       if (response.isNewThread && response.threadId && onThreadCreated) {
+        console.log('[ChatInterface] New thread created, notifying parent:', response.threadId)
         onThreadCreated(response.threadId)
       }
       
@@ -117,17 +128,20 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       // The Edge Function returns { success: true, data: { sessionId, status, ... } }
       const responseData = response.data || response
       if ((responseData.async || responseData.status === 'processing') && responseData.sessionId) {
+        console.log('[ChatInterface] Async response detected, setting up realtime')
         // Create a placeholder message with thinking indicator
         const thinkingMessage: Message = {
           id: responseData.sessionId,
           role: 'assistant',
           content: '🤔 Thinking...',
           timestamp: new Date(),
-          error: false
+          error: false,
+          orchestrationSessionId: responseData.sessionId
         }
         setMessages(prev => [...prev, thinkingMessage])
         
         // Use Supabase Realtime to subscribe to orchestration updates
+        console.log(`[ChatInterface] Setting up realtime subscription for session ${responseData.sessionId}`)
         const supabase = getBrowserClient()
         const channel = supabase
           .channel(`orchestration:${responseData.sessionId}`)
@@ -140,36 +154,102 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
               filter: `id=eq.${responseData.sessionId}`
             },
             (payload) => {
-              console.log('Orchestration update:', payload)
+              console.log('[ChatInterface] Orchestration update received:', {
+                eventType: payload.eventType,
+                status: payload.new?.status,
+                hasFinalResponse: !!payload.new?.final_response,
+                finalResponseLength: payload.new?.final_response?.length,
+                timestamp: new Date().toISOString()
+              })
               const session = payload.new as any
               
-              if (session.status === 'completed' && session.final_response) {
-                try {
-                  const finalResponse = JSON.parse(session.final_response)
-                  // Update the thinking message with the actual response
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === responseData.sessionId
-                      ? { 
-                          ...msg, 
-                          content: finalResponse.content || finalResponse,
-                          timestamp: new Date()
-                        }
-                      : msg
-                  ))
-                } catch (e) {
-                  // If parsing fails, use the raw response
-                  setMessages(prev => prev.map(msg => 
-                    msg.id === responseData.sessionId
-                      ? { 
-                          ...msg, 
-                          content: session.final_response,
-                          timestamp: new Date()
-                        }
-                      : msg
-                  ))
+              if (session.status === 'completed') {
+                // Fetch the complete session data since realtime might truncate large text fields
+                const fetchCompleteSession = async () => {
+                  console.log(`[ChatInterface] Session completed, fetching full data for ${responseData.sessionId}`)
+                  try {
+                    const { data: completeSession, error } = await supabase
+                      .from('orchestration_sessions')
+                      .select('*')
+                      .eq('id', responseData.sessionId)
+                      .single()
+                    
+                    console.log('[ChatInterface] Fetched complete session:', {
+                      hasData: !!completeSession,
+                      hasFinalResponse: !!completeSession?.final_response,
+                      finalResponseLength: completeSession?.final_response?.length,
+                      error
+                    })
+                    
+                    if (error || !completeSession) {
+                      throw new Error(`Failed to fetch complete session: ${error?.message}`)
+                    }
+                    
+                    if (completeSession.final_response) {
+                      const finalResponse = JSON.parse(completeSession.final_response)
+                      console.log('[ChatInterface] Parsed final response:', {
+                        hasContent: !!finalResponse.content,
+                        hasThreadId: !!finalResponse.threadId,
+                        contentPreview: finalResponse.content?.substring(0, 100) + '...'
+                      })
+                      // Update the thinking message with the actual response
+                      setMessages(prev => prev.map(msg => 
+                        msg.id === responseData.sessionId
+                          ? { 
+                              ...msg, 
+                              content: finalResponse.content || finalResponse,
+                              timestamp: new Date()
+                            }
+                          : msg
+                      ))
+                      
+                      // If a thread was created by the orchestrator, notify parent
+                      if (finalResponse.threadId && onThreadCreated && !sessionId) {
+                        console.log('[ChatInterface] Notifying parent of new thread:', finalResponse.threadId)
+                        onThreadCreated(finalResponse.threadId)
+                      }
+                    } else {
+                      console.warn('[ChatInterface] Complete session has no final_response')
+                    }
+                  } catch (e) {
+                    console.error('[ChatInterface] Error fetching complete session:', e)
+                    // Fallback to the truncated response if available
+                    if (session.final_response) {
+                      try {
+                        const finalResponse = JSON.parse(session.final_response)
+                        setMessages(prev => prev.map(msg => 
+                          msg.id === responseData.sessionId
+                            ? { 
+                                ...msg, 
+                                content: finalResponse.content || finalResponse,
+                                timestamp: new Date()
+                              }
+                            : msg
+                        ))
+                      } catch (parseError) {
+                        // If parsing fails, use the raw response
+                        setMessages(prev => prev.map(msg => 
+                          msg.id === responseData.sessionId
+                            ? { 
+                                ...msg, 
+                                content: session.final_response || 'Response completed',
+                                timestamp: new Date()
+                              }
+                            : msg
+                        ))
+                      }
+                    }
+                  }
+                  
+                  // Clear timeout
+                  if ((channel as any).timeoutId) {
+                    clearTimeout((channel as any).timeoutId)
+                  }
+                  channel.unsubscribe()
+                  setIsLoading(false)
                 }
-                channel.unsubscribe()
-                setIsLoading(false)
+                
+                fetchCompleteSession()
               } else if (session.status === 'failed') {
                 // Handle error
                 setMessages(prev => prev.map(msg => 
@@ -191,12 +271,16 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                     ? { ...msg, content: '⚡ Processing...' }
                     : msg
                 ))
+              } else {
+                console.log(`[ChatInterface] Unhandled session status: ${session.status}`)
               }
             }
           )
-          .subscribe()
+          .subscribe((status) => {
+            console.log(`[ChatInterface] Realtime subscription status: ${status}`)
+          })
         
-        // Store channel reference for cleanup
+        // Store timeout for cleanup
         const timeoutId = setTimeout(() => {
           // Timeout after 5 minutes
           channel.unsubscribe()
@@ -212,8 +296,12 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
           ))
           setIsLoading(false)
         }, 5 * 60 * 1000)
+        
+        // Store cleanup function on the channel
+        ;(channel as any).timeoutId = timeoutId
       } else {
         // Sync response (shouldn't happen anymore)
+        console.log('[ChatInterface] Unexpected sync response')
         const assistantMessage: Message = {
           id: response.interactionId || crypto.randomUUID(),
           role: 'assistant',
@@ -276,21 +364,31 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                         : 'order-1'
                     }`}
                   >
-                    <div
-                      className={`rounded-lg px-4 py-3 ${
-                        message.role === 'assistant'
-                          ? 'bg-white border border-gray-200 text-gray-900'
-                          : 'bg-blue-600 text-white'
-                      } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
-                    >
-                      {message.role === 'assistant' ? (
-                        <div className="prose prose-sm max-w-none">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                            {message.content}
-                          </ReactMarkdown>
+                    <div>
+                      <div
+                        className={`rounded-lg px-4 py-3 ${
+                          message.role === 'assistant'
+                            ? 'bg-white border border-gray-200 text-gray-900'
+                            : 'bg-blue-600 text-white'
+                        } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
+                      >
+                        {message.role === 'assistant' ? (
+                          <div className="prose prose-sm max-w-none">
+                            <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                              {message.content}
+                            </ReactMarkdown>
+                          </div>
+                        ) : (
+                          <p className="whitespace-pre-wrap">{message.content}</p>
+                        )}
+                      </div>
+                      {message.orchestrationSessionId && message.role === 'assistant' && (
+                        <div className="mt-2">
+                          <OrchestrationSteps 
+                            sessionId={message.orchestrationSessionId} 
+                            isMinimized={!message.content.includes('Thinking')}
+                          />
                         </div>
-                      ) : (
-                        <p className="whitespace-pre-wrap">{message.content}</p>
                       )}
                     </div>
                     <div className="mt-1 text-xs text-gray-500 px-1">

@@ -51,14 +51,25 @@ export async function verify(
   )
   
   try {
-    const verification = JSON.parse(response.content || '{}')
+    let content = response.content || '{}'
+    
+    // Extract JSON from markdown code blocks if present
+    const jsonMatch = content.match(/```(?:json)?\s*\n?({[\s\S]*?})\s*\n?```/)
+    if (jsonMatch) {
+      content = jsonMatch[1]
+    }
+    
+    const verification = JSON.parse(content)
     return {
       goalAchieved: verification.goalAchieved ?? false,
       confidence: verification.confidence ?? 0,
       issues: verification.issues || [],
       suggestions: verification.suggestions || []
     }
-  } catch {
+  } catch (error) {
+    console.error('Failed to parse verification response:', error)
+    console.error('Response content:', response.content)
+    
     // If parsing fails, assume verification failed
     return {
       goalAchieved: false,

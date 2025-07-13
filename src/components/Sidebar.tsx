@@ -5,6 +5,7 @@ import { ChevronDown, MessageSquare, Trash2, Edit2 } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
+import { getBrowserClient } from '@/lib/supabase-browser'
 
 interface ChatThread {
   id: string
@@ -33,13 +34,44 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
   useEffect(() => {
     loadThreads(true)
     
-    // Poll for updates every 5 seconds when component is mounted
-    const interval = setInterval(() => {
-      loadThreads(false)
-    }, 5000)
+    // Set up Supabase Realtime subscription for chat_threads changes
+    const supabase = getBrowserClient()
+    const channel = supabase
+      .channel('chat-threads-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+          schema: 'public',
+          table: 'chat_threads',
+          filter: user ? `user_id=eq.${user.id}` : undefined
+        },
+        (payload) => {
+          console.log('Thread change detected:', payload)
+          
+          if (payload.eventType === 'INSERT') {
+            // Add new thread to the list
+            const newThread = payload.new as ChatThread
+            setThreads(prev => [newThread, ...prev])
+          } else if (payload.eventType === 'UPDATE') {
+            // Update existing thread
+            const updatedThread = payload.new as ChatThread
+            setThreads(prev => prev.map(t => 
+              t.id === updatedThread.id ? updatedThread : t
+            ))
+          } else if (payload.eventType === 'DELETE') {
+            // Remove deleted thread
+            const deletedThread = payload.old as { id: string }
+            setThreads(prev => prev.filter(t => t.id !== deletedThread.id))
+          }
+        }
+      )
+      .subscribe()
     
-    return () => clearInterval(interval)
-  }, [])
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [user])
 
   // Refresh when refreshTrigger changes (e.g., new thread created)
   useEffect(() => {
@@ -55,21 +87,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
       // Handle both { threads: [...] } and direct array responses
       const threadData = response.threads || response || []
       const newThreads = Array.isArray(threadData) ? threadData : []
-      
-      // More comprehensive comparison to avoid unnecessary updates
-      const hasChanges = threads.length !== newThreads.length || 
-        threads.some((oldThread, index) => {
-          const newThread = newThreads[index]
-          return !newThread || 
-                 oldThread.id !== newThread.id || 
-                 oldThread.title !== newThread.title ||
-                 oldThread.message_count !== newThread.message_count ||
-                 oldThread.updated_at !== newThread.updated_at
-        })
-      
-      if (hasChanges || threads.length === 0) {
-        setThreads(newThreads)
-      }
+      setThreads(newThreads)
     } catch (error) {
       console.error('Failed to load threads:', error)
       if (isInitialLoad) setThreads([])

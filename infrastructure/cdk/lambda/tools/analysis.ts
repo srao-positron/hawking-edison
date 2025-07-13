@@ -18,6 +18,7 @@ export const analysisTools: ToolDefinition[] = [
       properties: {
         responses: {
           type: 'array',
+          items: { type: 'object' },
           description: 'Responses to analyze'
         },
         focusAreas: {
@@ -132,13 +133,12 @@ Return a structured analysis.`
       type: 'object',
       properties: {
         discussion: {
-          type: 'any',
+          type: 'object',
           description: 'Discussion or responses to analyze'
         },
         threshold: {
           type: 'number',
-          description: 'Agreement threshold (0-1)',
-          default: 0.7
+          description: 'Agreement threshold (0-1) - default: 0.7'
         }
       },
       required: ['discussion']
@@ -216,7 +216,7 @@ Structure your response as JSON with these sections.`
       type: 'object',
       properties: {
         results: {
-          type: 'any',
+          type: 'object',
           description: 'Results to validate'
         },
         expectations: {
@@ -225,6 +225,7 @@ Structure your response as JSON with these sections.`
         },
         withAgents: {
           type: 'array',
+          items: { type: 'object' },
           description: 'Optional agents to help validate'
         }
       },

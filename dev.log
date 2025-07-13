@@ -8,64 +8,112 @@
    - Environments: .env.local, .env
 
  ✓ Starting...
- ✓ Ready in 1527ms
- ✓ Compiled /middleware in 166ms (180 modules)
+ ✓ Ready in 1214ms
+ ✓ Compiled /middleware in 136ms (180 modules)
+ ○ Compiling /chat/[threadId] ...
+ ✓ Compiled /chat/[threadId] in 3.8s (3330 modules)
+ ✓ Compiled in 140ms (1388 modules)
+ GET /chat/great-path-16 200 in 4558ms
  ○ Compiling /chat ...
- ✓ Compiled /chat in 4.7s (3328 modules)
- GET /chat 200 in 5043ms
- ✓ Compiled in 260ms (1387 modules)
+ ✓ Compiled /chat in 705ms (3321 modules)
+ GET /chat 200 in 903ms
+ GET /chat/grand-dew-872 200 in 56ms
+ GET /chat/blue-garden-852 200 in 41ms
+ GET /chat/sunny-dew-396 200 in 40ms
+ GET /chat/sunny-dew-396 200 in 56ms
+ GET /chat/sunny-dew-396 200 in 71ms
+ GET /chat/grand-dew-872 200 in 42ms
+ GET /chat/sunny-dew-396 200 in 38ms
+ ✓ Compiled in 306ms (1389 modules)
+ GET /chat/sunny-dew-396 200 in 19ms
+ ✓ Compiled in 490ms (3335 modules)
+ GET /chat/sunny-dew-396 200 in 54ms
+ ✓ Compiled in 324ms (3335 modules)
+ GET /chat/sunny-dew-396 200 in 63ms
+ ✓ Compiled in 430ms (3335 modules)
+ GET /chat/sunny-dew-396 200 in 39ms
+ ✓ Compiled in 501ms (3357 modules)
+ GET /chat/sunny-dew-396 200 in 38ms
+ ✓ Compiled in 313ms (3357 modules)
+ GET /chat/sunny-dew-396 200 in 48ms
+ GET /chat/sunny-dew-396 200 in 168ms
+ GET /chat 200 in 51ms
+ GET /chat 200 in 45ms
+ GET /chat/easy-storm-5 200 in 10ms
+ GET /chat/easy-storm-5 200 in 29ms
+ GET /chat/easy-storm-5 200 in 49ms
  ○ Compiling /_not-found ...
- ✓ Compiled /_not-found in 906ms (3318 modules)
- GET /.well-known/appspecific/com.chrome.devtools.json 404 in 991ms
- GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 285ms
- GET /chat 200 in 147ms
- GET /.well-known/appspecific/com.chrome.devtools.json 404 in 20ms
- GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 52ms
- ✓ Compiled in 689ms (3328 modules)
- GET /chat 200 in 57ms
- ✓ Compiled in 295ms (3328 modules)
- GET /chat 200 in 35ms
- ⚠ Fast Refresh had to perform a full reload. Read more: https://nextjs.org/docs/messages/fast-refresh-reload
- ✓ Compiled in 672ms (3328 modules)
- ⨯ [Error: Attempted to call generateViewport() from the server but generateViewport is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.] {
-  digest: '1885803959'
-}
- ⨯ [Error: Element type is invalid: expected a string (for built-in components) or a class/function (for composite components) but got: undefined. You likely forgot to export your component from the file it's defined in, or you might have mixed up default and named imports.] {
-  digest: '3052987909'
-}
- GET /chat 500 in 439ms
- ⨯ [Error: Attempted to call generateViewport() from the server but generateViewport is on the client. It's not possible to invoke a client function from the server, it can only be rendered as a Component or passed to props of a Client Component.] {
-  digest: '1885803959'
-}
- GET /chat 200 in 144ms
- ✓ Compiled /_not-found in 301ms (3318 modules)
- GET /.well-known/appspecific/com.chrome.devtools.json 404 in 359ms
+ ✓ Compiled /_not-found in 772ms (3347 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 879ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 356ms
+ GET /chat/easy-storm-5 200 in 151ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 22ms
  GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 21ms
- ✓ Compiled in 432ms (3332 modules)
- ⚠ Fast Refresh had to perform a full reload due to a runtime error.
- GET /chat 200 in 119ms
- GET /.well-known/appspecific/com.chrome.devtools.json 404 in 27ms
- GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 20ms
- ✓ Compiled in 224ms (3318 modules)
- ✓ Compiled in 594ms (3314 modules)
-   Reload env: .env.local
- ✓ Compiled in 506ms (3494 modules)
- GET /chat 200 in 55ms
- ✓ Compiled in 181ms (1387 modules)
- ✓ Compiled in 443ms (3494 modules)
- GET /chat 200 in 252ms
- GET /chat 200 in 8ms
- GET /chat 200 in 10ms
- ✓ Compiled in 509ms (3494 modules)
- GET /chat 200 in 34ms
- GET /chat 200 in 9ms
- ✓ Compiled in 340ms (1387 modules)
- GET /chat 200 in 11ms
- ✓ Compiled in 175ms (1387 modules)
- GET /chat 200 in 15ms
- ✓ Compiled in 312ms (1387 modules)
- GET /chat 200 in 12ms
- ✓ Compiled in 129ms (1387 modules)
- GET /chat 200 in 10ms
- ✓ Compiled in 270ms (1387 modules)
-[?25h
+ GET /chat 200 in 84ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 14ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 35ms
+ GET /chat 200 in 50ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 16ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 29ms
+ GET /chat/simple-day-691 200 in 17ms
+ GET /chat/simple-day-691 200 in 23ms
+ ✓ Compiled in 599ms (3357 modules)
+ GET /chat/simple-day-691 200 in 61ms
+ ✓ Compiled in 505ms (3357 modules)
+ GET /chat/simple-day-691 200 in 50ms
+ ✓ Compiled in 328ms (3357 modules)
+ GET /chat/simple-day-691 200 in 60ms
+ ✓ Compiled in 274ms (3357 modules)
+ GET /chat/simple-day-691 200 in 42ms
+ ✓ Compiled in 345ms (3357 modules)
+ GET /chat/simple-day-691 200 in 50ms
+ ✓ Compiled in 333ms (3357 modules)
+ GET /chat/simple-day-691 200 in 36ms
+ ✓ Compiled in 295ms (3357 modules)
+ GET /chat/simple-day-691 200 in 39ms
+ ✓ Compiled in 331ms (3357 modules)
+ GET /chat/simple-day-691 200 in 56ms
+ ✓ Compiled in 285ms (3357 modules)
+ GET /chat/simple-day-691 200 in 39ms
+ ✓ Compiled in 347ms (3357 modules)
+ GET /chat/simple-day-691 200 in 49ms
+ ✓ Compiled in 571ms (3357 modules)
+ GET /chat/simple-day-691 200 in 58ms
+ ✓ Compiled in 334ms (3357 modules)
+ GET /chat/simple-day-691 200 in 58ms
+ GET /chat/simple-day-691 200 in 170ms
+ ○ Compiling /_not-found ...
+ ✓ Compiled /_not-found in 794ms (3347 modules)
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 900ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 347ms
+ GET /chat 200 in 47ms
+ GET /chat/quiet-creek-258 200 in 167ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 22ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 13ms
+ GET /chat 200 in 61ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 16ms
+ GET /_next/static/chunks/app/chat/VisuallyHidden.module.css.mjs.map 404 in 30ms
+ GET /chat/quiet-creek-258 200 in 25ms
+ GET /chat/wise-fog-86 200 in 29ms
+ ✓ Compiled in 824ms (3357 modules)
+ GET /chat/wise-fog-86 200 in 53ms
+ ✓ Compiled in 310ms (3357 modules)
+ GET /chat/wise-fog-86 200 in 41ms
+ ✓ Compiled in 569ms (3343 modules)
+ ✓ Compiled in 672ms (3523 modules)
+ GET /chat/wise-fog-86 200 in 58ms
+ GET /chat/wise-fog-86 200 in 8ms
+ ✓ Compiled in 158ms (1400 modules)
+ ✓ Compiled in 415ms (3523 modules)
+ GET /chat/wise-fog-86 200 in 372ms
+ GET /chat/wise-fog-86 200 in 10ms
+ GET /chat/wise-fog-86 200 in 8ms
+ ✓ Compiled in 643ms (3523 modules)
+ GET /chat/wise-fog-86 200 in 153ms
+ GET /chat/wise-fog-86 200 in 12ms
+ ✓ Compiled in 152ms (1400 modules)
+ GET /chat/wise-fog-86 200 in 15ms
+ ✓ Compiled in 150ms (1400 modules)
+ GET /chat/wise-fog-86 200 in 14ms
+ ✓ Compiled in 291ms (1400 modules)
+ GET /chat/wise-fog-86 200 in 20ms

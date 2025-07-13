@@ -25,8 +25,7 @@ export const memoryTools: ToolDefinition[] = [
         },
         scope: {
           type: 'string',
-          description: 'What memories to include (recent, all, specific-topic)',
-          default: 'all'
+          description: 'What memories to include (recent, all, specific-topic) - default: all'
         }
       },
       required: ['agent', 'memoryKey']
@@ -114,7 +113,7 @@ export const memoryTools: ToolDefinition[] = [
           description: 'Where to store this memory (e.g., "project-alpha-discussions")'
         },
         content: {
-          type: 'any',
+          type: 'object',
           description: 'What to remember (discussion, insights, decisions, etc)'
         },
         metadata: {
@@ -184,8 +183,7 @@ export const memoryTools: ToolDefinition[] = [
         },
         limit: {
           type: 'number',
-          description: 'Maximum results to return',
-          default: 10
+          description: 'Maximum results to return (default: 10)'
         }
       },
       required: ['query']

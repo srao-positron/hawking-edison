@@ -1,6 +1,5 @@
 // AWS SNS client for Edge Functions
 import { SNSClient, PublishCommand } from "npm:@aws-sdk/client-sns@3"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 interface SNSConfig {
   accessKeyId: string
@@ -12,51 +11,29 @@ interface SNSConfig {
 // Cache config for the lifetime of the function instance
 let cachedConfig: SNSConfig | null = null
 
-// Get SNS configuration - credentials from env, topic ARN from database
+// Get SNS configuration from environment variables
 export async function getSNSConfig(): Promise<SNSConfig | null> {
   // Return cached config if available
   if (cachedConfig) return cachedConfig
 
-  // Get credentials from environment variables (stable IAM user)
+  // Get all config from environment variables
   const accessKeyId = Deno.env.get('AWS_ACCESS_KEY_ID')
   const secretAccessKey = Deno.env.get('AWS_SECRET_ACCESS_KEY')
   const region = Deno.env.get('AWS_REGION') || 'us-east-2'
+  const topicArn = Deno.env.get('AWS_SNS_TOPIC_ARN')
   
-  if (!accessKeyId || !secretAccessKey) {
-    console.error('AWS credentials not found in environment variables')
+  console.log('Getting SNS config from environment:', {
+    hasAccessKey: !!accessKeyId,
+    hasSecretKey: !!secretAccessKey,
+    region,
+    topicArn
+  })
+  
+  if (!accessKeyId || !secretAccessKey || !topicArn) {
+    console.error('Missing required AWS environment variables')
     return null
   }
 
-  // Get topic ARN from database (updated by CDK)
-  let topicArn = Deno.env.get('AWS_SNS_TOPIC_ARN') // Fallback
-  
-  try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    
-    if (supabaseUrl && supabaseServiceKey) {
-      const supabase = createClient(supabaseUrl, supabaseServiceKey)
-      
-      // Get topic ARN from database (CDK updates this)
-      const { data, error } = await supabase.rpc('get_aws_credentials')
-      
-      if (!error && data && data.topicArn) {
-        console.log('Retrieved topic ARN from database:', data.topicArn)
-        topicArn = data.topicArn
-      } else if (error) {
-        console.warn('Failed to retrieve topic ARN from database:', error.message)
-      }
-    }
-  } catch (error) {
-    console.warn('Error accessing database for topic ARN:', error)
-  }
-
-  if (!topicArn) {
-    console.error('No SNS topic ARN found')
-    return null
-  }
-
-  console.log('Using AWS credentials from environment, topic ARN from database')
   cachedConfig = {
     accessKeyId,
     secretAccessKey,
@@ -69,13 +46,25 @@ export async function getSNSConfig(): Promise<SNSConfig | null> {
 
 // Publish message to SNS
 export async function publishToSNS(message: any): Promise<boolean> {
+  console.log('[SNS] publishToSNS called with message:', JSON.stringify(message))
+  
   const config = await getSNSConfig()
+  console.log('[SNS] getSNSConfig returned:', config ? 'config found' : 'no config')
+  
   if (!config) {
-    console.error('SNS not configured, skipping publish')
+    console.error('[SNS] SNS not configured, skipping publish')
     return false
   }
 
+  console.log('[SNS] Config details:', {
+    hasAccessKey: !!config.accessKeyId,
+    hasSecretKey: !!config.secretAccessKey,
+    region: config.region,
+    topicArn: config.topicArn
+  })
+
   try {
+    console.log('[SNS] Creating SNS client...')
     const client = new SNSClient({
       region: config.region,
       credentials: {
@@ -84,6 +73,7 @@ export async function publishToSNS(message: any): Promise<boolean> {
       }
     })
 
+    console.log('[SNS] Creating PublishCommand...')
     const command = new PublishCommand({
       TopicArn: config.topicArn,
       Message: JSON.stringify(message),
@@ -99,11 +89,13 @@ export async function publishToSNS(message: any): Promise<boolean> {
       }
     })
 
+    console.log('[SNS] Sending command to SNS...')
     const response = await client.send(command)
-    console.log('Published to SNS:', response.MessageId)
+    console.log('[SNS] Successfully published to SNS! MessageId:', response.MessageId)
     return true
   } catch (error) {
-    console.error('Failed to publish to SNS:', error)
+    console.error('[SNS] Failed to publish to SNS:', error)
+    console.error('[SNS] Error details:', JSON.stringify(error, null, 2))
     return false
   }
 }

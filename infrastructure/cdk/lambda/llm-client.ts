@@ -67,10 +67,12 @@ export async function callLLMWithTools(
 ): Promise<LLMResponse> {
   const keys = await getApiKeys()
   
-  if (provider === 'claude') {
-    return callClaudeWithTools(messages, tools, keys.anthropic!)
+  if (provider === 'claude' && keys.anthropic) {
+    return callClaudeWithTools(messages, tools, keys.anthropic)
+  } else if (provider === 'openai' && keys.openai) {
+    return callOpenAIWithTools(messages, tools, keys.openai)
   } else {
-    return callOpenAIWithTools(messages, tools, keys.openai!)
+    throw new Error(`No API key available for provider: ${provider}`)
   }
 }
 
@@ -94,6 +96,52 @@ async function callClaudeWithTools(
     }
   }))
   
+  // Log the request
+  console.log('=== CLAUDE API REQUEST ===')
+  console.log('Model: claude-opus-4-20250514')
+  console.log('System:', systemMessage.substring(0, 200) + '...')
+  console.log('Messages:', conversationMessages.length)
+  console.log('Last message role:', conversationMessages[conversationMessages.length - 1]?.role)
+  console.log('Tools:', tools.length)
+  
+  const requestBody = {
+    model: 'claude-opus-4-20250514', // Using Claude 4 Opus
+    system: systemMessage,
+    messages: conversationMessages.map(msg => {
+      if (msg.role === 'tool') {
+        return {
+          role: 'user',
+          content: [{
+            type: 'tool_result',
+            tool_use_id: msg.toolCallId,
+            content: msg.content
+          }]
+        }
+      }
+      
+      if (msg.toolCalls) {
+        return {
+          role: 'assistant',
+          content: msg.toolCalls.map(tc => ({
+            type: 'tool_use',
+            id: tc.id,
+            name: tc.name,
+            input: tc.arguments
+          }))
+        }
+      }
+      
+      return {
+        role: msg.role,
+        content: msg.content
+      }
+    }),
+    tools: claudeTools,
+    max_tokens: 4096
+  }
+  
+  console.log('Request body:', JSON.stringify(requestBody, null, 2))
+  
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -101,49 +149,19 @@ async function callClaudeWithTools(
       'x-api-key': apiKey,
       'anthropic-version': '2023-06-01'
     },
-    body: JSON.stringify({
-      model: 'claude-3-opus-20240229',
-      system: systemMessage,
-      messages: conversationMessages.map(msg => {
-        if (msg.role === 'tool') {
-          return {
-            role: 'user',
-            content: [{
-              type: 'tool_result',
-              tool_use_id: msg.toolCallId,
-              content: msg.content
-            }]
-          }
-        }
-        
-        if (msg.toolCalls) {
-          return {
-            role: 'assistant',
-            content: msg.toolCalls.map(tc => ({
-              type: 'tool_use',
-              id: tc.id,
-              name: tc.name,
-              input: tc.arguments
-            }))
-          }
-        }
-        
-        return {
-          role: msg.role,
-          content: msg.content
-        }
-      }),
-      tools: claudeTools,
-      max_tokens: 4096
-    })
+    body: JSON.stringify(requestBody)
   })
   
+  const responseText = await response.text()
+  console.log('=== CLAUDE API RESPONSE ===')
+  console.log('Status:', response.status)
+  console.log('Response:', responseText.substring(0, 500) + '...')
+  
   if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Claude API error: ${error}`)
+    throw new Error(`Claude API error: ${responseText}`)
   }
   
-  const data = await response.json() as any
+  const data = JSON.parse(responseText) as any
   
   // Parse response
   const result: LLMResponse = {
@@ -190,7 +208,7 @@ async function callOpenAIWithTools(
     
     if (msg.toolCalls) {
       return {
-        role: msg.role as 'assistant',
+        role: 'assistant' as const,
         content: null,
         tool_calls: msg.toolCalls.map(tc => ({
           id: tc.id,
@@ -233,8 +251,7 @@ async function callOpenAIWithTools(
       model: 'gpt-4-turbo-preview',
       messages: openAIMessages,
       tools: openAITools,
-      tool_choice: 'auto',
-      max_tokens: 4096
+      tool_choice: 'auto'
     })
   })
   

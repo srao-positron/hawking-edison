@@ -23,10 +23,10 @@ export class HawkingEdisonStack extends cdk.Stack {
       secretName: 'hawking-edison/api-keys',
       description: 'API keys for LLM providers and Supabase',
       secretObjectValue: {
-        SUPABASE_URL: cdk.SecretValue.unsafePlainText('PLACEHOLDER'),
-        SUPABASE_SERVICE_ROLE_KEY: cdk.SecretValue.unsafePlainText('PLACEHOLDER'),
-        ANTHROPIC_API_KEY: cdk.SecretValue.unsafePlainText('PLACEHOLDER'),
-        OPENAI_API_KEY: cdk.SecretValue.unsafePlainText('PLACEHOLDER'),
+        SUPABASE_URL: cdk.SecretValue.unsafePlainText(process.env.SUPABASE_URL || 'PLACEHOLDER'),
+        SUPABASE_SERVICE_ROLE_KEY: cdk.SecretValue.unsafePlainText(process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER'),
+        ANTHROPIC_API_KEY: cdk.SecretValue.unsafePlainText(process.env.ANTHROPIC_API_KEY || 'PLACEHOLDER'),
+        OPENAI_API_KEY: cdk.SecretValue.unsafePlainText(process.env.OPENAI_API_KEY || 'PLACEHOLDER'),
       },
     })
 
@@ -123,42 +123,42 @@ export class HawkingEdisonStack extends cdk.Stack {
       },
     })
 
-    // Create Lambda function to store credentials in Vault
-    const vaultCredentialManager = new lambdaNodejs.NodejsFunction(this, 'VaultCredentialManager', {
-      entry: path.join(__dirname, '../lambda/vault-credential-manager.ts'),
-      runtime: lambda.Runtime.NODEJS_20_X,
-      handler: 'handler',
-      timeout: cdk.Duration.minutes(2),
-      environment: {
-        NODE_OPTIONS: '--enable-source-maps',
-      },
-      bundling: {
-        minify: false,
-        sourceMap: true,
-        target: 'es2022',
-        externalModules: [],
-      },
-    })
+    // // Create Lambda function to store credentials in Vault
+    // const vaultCredentialManager = new lambdaNodejs.NodejsFunction(this, 'VaultCredentialManager', {
+    //   entry: path.join(__dirname, '../lambda/vault-credential-manager.ts'),
+    //   runtime: lambda.Runtime.NODEJS_20_X,
+    //   handler: 'handler',
+    //   timeout: cdk.Duration.minutes(2),
+    //   environment: {
+    //     NODE_OPTIONS: '--enable-source-maps',
+    //   },
+    //   bundling: {
+    //     minify: false,
+    //     sourceMap: true,
+    //     target: 'es2022',
+    //     externalModules: [],
+    //   },
+    // })
 
-    // Store the secret access key in environment for the Lambda to retrieve
-    vaultCredentialManager.addEnvironment('ACCESS_KEY_ID', accessKey.accessKeyId)
-    vaultCredentialManager.addEnvironment('REGION', this.region)
-    vaultCredentialManager.addEnvironment('TOPIC_ARN', orchestrationTopic.topicArn)
-    vaultCredentialManager.addEnvironment('SUPABASE_URL', process.env.SUPABASE_URL || 'PLACEHOLDER')
-    vaultCredentialManager.addEnvironment('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER')
-    vaultCredentialManager.addEnvironment('VAULT_STORE_SERVICE_KEY', process.env.VAULT_STORE_SERVICE_KEY || 'PLACEHOLDER')
-    vaultCredentialManager.addEnvironment('VERCEL_URL', process.env.VERCEL_URL || 'https://hawking-edison.vercel.app')
-    
-    // Grant permission to retrieve the secret
-    edgeFunctionCredsSecret.grantRead(vaultCredentialManager)
-    
-    // Use custom resource to store credentials in Vault
-    const storeInVault = new cdk.CustomResource(this, 'StoreCredsInVault', {
-      serviceToken: vaultCredentialManager.functionArn,
-      properties: {
-        SecretArn: edgeFunctionCredsSecret.secretArn,
-      }
-    })
+    // // Store the secret access key in environment for the Lambda to retrieve
+    // vaultCredentialManager.addEnvironment('ACCESS_KEY_ID', accessKey.accessKeyId)
+    // vaultCredentialManager.addEnvironment('REGION', this.region)
+    // vaultCredentialManager.addEnvironment('TOPIC_ARN', orchestrationTopic.topicArn)
+    // vaultCredentialManager.addEnvironment('SUPABASE_URL', process.env.SUPABASE_URL || 'PLACEHOLDER')
+    // vaultCredentialManager.addEnvironment('SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY || 'PLACEHOLDER')
+    // vaultCredentialManager.addEnvironment('VAULT_STORE_SERVICE_KEY', process.env.VAULT_STORE_SERVICE_KEY || 'PLACEHOLDER')
+    // vaultCredentialManager.addEnvironment('VERCEL_URL', process.env.VERCEL_URL || 'https://hawking-edison.vercel.app')
+    // 
+    // // Grant permission to retrieve the secret
+    // edgeFunctionCredsSecret.grantRead(vaultCredentialManager)
+    // 
+    // // Use custom resource to store credentials in Vault
+    // const storeInVault = new cdk.CustomResource(this, 'StoreCredsInVault', {
+    //   serviceToken: vaultCredentialManager.functionArn,
+    //   properties: {
+    //     SecretArn: edgeFunctionCredsSecret.secretArn,
+    //   }
+    // })
 
     // Outputs
     new cdk.CfnOutput(this, 'OrchestrationTopicArn', {

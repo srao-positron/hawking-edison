@@ -78,11 +78,12 @@ serve(async (req) => {
             )
           }
 
-          // Get messages for the thread
+          // Get messages for the thread (excluding system messages)
           const { data: messages, error: messagesError } = await supabase
             .from('chat_messages')
             .select('*')
             .eq('thread_id', threadId)
+            .in('role', ['user', 'assistant']) // Only return user and assistant messages
             .order('created_at', { ascending: true })
 
           if (messagesError) {

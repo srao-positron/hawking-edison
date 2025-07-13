@@ -16,6 +16,7 @@ export const interactionTools: ToolDefinition[] = [
       properties: {
         agents: {
           type: 'array',
+          items: { type: 'object' },
           description: 'Array of agents who will participate'
         },
         topic: {
@@ -24,13 +25,11 @@ export const interactionTools: ToolDefinition[] = [
         },
         style: {
           type: 'string',
-          description: 'Discussion style (debate, brainstorm, analysis, negotiation)',
-          default: 'collaborative'
+          description: 'Discussion style (debate, brainstorm, analysis, negotiation) - default: collaborative'
         },
         rounds: {
           type: 'number',
-          description: 'How many rounds of discussion',
-          default: 3
+          description: 'How many rounds of discussion (default: 3)'
         }
       },
       required: ['agents', 'topic']
@@ -110,6 +109,7 @@ export const interactionTools: ToolDefinition[] = [
       properties: {
         agents: {
           type: 'array',
+          items: { type: 'object' },
           description: 'Array of agents to respond'
         },
         prompt: {
@@ -118,8 +118,7 @@ export const interactionTools: ToolDefinition[] = [
         },
         structured: {
           type: 'boolean',
-          description: 'Whether to ask for structured responses',
-          default: false
+          description: 'Whether to ask for structured responses (default: false)'
         }
       },
       required: ['agents', 'prompt']
@@ -192,8 +191,7 @@ export const interactionTools: ToolDefinition[] = [
         },
         depth: {
           type: 'number',
-          description: 'How many follow-up questions',
-          default: 3
+          description: 'How many follow-up questions (default: 3)'
         }
       },
       required: ['interviewer', 'interviewee', 'topic']

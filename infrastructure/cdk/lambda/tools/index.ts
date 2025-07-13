@@ -11,6 +11,7 @@ import { agentTools } from './agent'
 import { interactionTools } from './interaction'
 import { analysisTools } from './analysis'
 import { memoryTools } from './memory'
+import { searchThreadHistory, getThreadSummary } from './thread-search'
 
 export interface ToolExecutionContext {
   supabase: ReturnType<typeof createClient>
@@ -37,7 +38,9 @@ registerTools([
   ...agentTools,
   ...interactionTools,
   ...analysisTools,
-  ...memoryTools
+  ...memoryTools,
+  searchThreadHistory,
+  getThreadSummary
 ])
 
 // Get tool definitions for LLM

@@ -38,6 +38,7 @@
     "validate": "tsx utils/validate-structure.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch-logs": "^3.844.0",
     "@aws-sdk/client-secrets-manager": "^3.844.0",
     "@aws-sdk/client-sns": "^3.840.0",
     "@dqbd/tiktoken": "^1.0.21",

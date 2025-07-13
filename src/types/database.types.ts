@@ -130,6 +130,36 @@ export type Database = {
         }
         Relationships: []
       }
+      aws_credentials: {
+        Row: {
+          access_key_id: string
+          created_at: string | null
+          id: string
+          region: string
+          secret_access_key: string
+          topic_arn: string
+          updated_at: string | null
+        }
+        Insert: {
+          access_key_id: string
+          created_at?: string | null
+          id?: string
+          region: string
+          secret_access_key: string
+          topic_arn: string
+          updated_at?: string | null
+        }
+        Update: {
+          access_key_id?: string
+          created_at?: string | null
+          id?: string
+          region?: string
+          secret_access_key?: string
+          topic_arn?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       chat_messages: {
         Row: {
           content: string
@@ -305,6 +335,241 @@ export type Database = {
           },
         ]
       }
+      mcp_data_sources: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          mcp_server_id: string
+          metadata: Json | null
+          name: string
+          schema: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          mcp_server_id: string
+          metadata?: Json | null
+          name: string
+          schema?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          mcp_server_id?: string
+          metadata?: Json | null
+          name?: string
+          schema?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_data_sources_mcp_server_id_fkey"
+            columns: ["mcp_server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_execution_logs: {
+        Row: {
+          created_at: string | null
+          duration_ms: number | null
+          error: string | null
+          id: string
+          mcp_server_id: string
+          request: Json
+          response: Json | null
+          session_id: string
+          status: string
+          thread_id: string | null
+          tool_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          mcp_server_id: string
+          request: Json
+          response?: Json | null
+          session_id: string
+          status: string
+          thread_id?: string | null
+          tool_name: string
+        }
+        Update: {
+          created_at?: string | null
+          duration_ms?: number | null
+          error?: string | null
+          id?: string
+          mcp_server_id?: string
+          request?: Json
+          response?: Json | null
+          session_id?: string
+          status?: string
+          thread_id?: string | null
+          tool_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_execution_logs_mcp_server_id_fkey"
+            columns: ["mcp_server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_execution_logs_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "orchestration_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mcp_execution_logs_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_oauth_tokens: {
+        Row: {
+          access_token: string
+          created_at: string | null
+          expires_at: string | null
+          id: string
+          mcp_server_id: string
+          refresh_token: string | null
+          scope: string | null
+          token_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          mcp_server_id: string
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string
+          created_at?: string | null
+          expires_at?: string | null
+          id?: string
+          mcp_server_id?: string
+          refresh_token?: string | null
+          scope?: string | null
+          token_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_oauth_tokens_mcp_server_id_fkey"
+            columns: ["mcp_server_id"]
+            isOneToOne: true
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_servers: {
+        Row: {
+          config: Json
+          connection_error: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          is_oauth: boolean | null
+          last_connected_at: string | null
+          name: string
+          oauth_provider: string | null
+          type: string
+          updated_at: string | null
+          url: string | null
+          user_id: string
+        }
+        Insert: {
+          config: Json
+          connection_error?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_oauth?: boolean | null
+          last_connected_at?: string | null
+          name: string
+          oauth_provider?: string | null
+          type: string
+          updated_at?: string | null
+          url?: string | null
+          user_id: string
+        }
+        Update: {
+          config?: Json
+          connection_error?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          is_oauth?: boolean | null
+          last_connected_at?: string | null
+          name?: string
+          oauth_provider?: string | null
+          type?: string
+          updated_at?: string | null
+          url?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      mcp_tools: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          description: string | null
+          id: string
+          mcp_server_id: string
+          metadata: Json | null
+          name: string
+          schema: Json
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          mcp_server_id: string
+          metadata?: Json | null
+          name: string
+          schema: Json
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          mcp_server_id?: string
+          metadata?: Json | null
+          name?: string
+          schema?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_tools_mcp_server_id_fkey"
+            columns: ["mcp_server_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_servers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
@@ -339,6 +604,54 @@ export type Database = {
             columns: ["thread_id"]
             isOneToOne: false
             referencedRelation: "threads"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      orchestration_events: {
+        Row: {
+          created_at: string | null
+          event_data: Json
+          event_type: string
+          id: string
+          metadata: Json | null
+          session_id: string
+          thread_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_data: Json
+          event_type: string
+          id?: string
+          metadata?: Json | null
+          session_id: string
+          thread_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json
+          event_type?: string
+          id?: string
+          metadata?: Json | null
+          session_id?: string
+          thread_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orchestration_events_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "orchestration_sessions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orchestration_events_thread_id_fkey"
+            columns: ["thread_id"]
+            isOneToOne: false
+            referencedRelation: "chat_threads"
             referencedColumns: ["id"]
           },
         ]
@@ -684,6 +997,10 @@ export type Database = {
         Args: { first_message: string }
         Returns: string
       }
+      get_aws_credentials: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -736,6 +1053,15 @@ export type Database = {
         Args: { "": string } | { "": unknown } | { "": unknown }
         Returns: string
       }
+      log_orchestration_event: {
+        Args: {
+          p_session_id: string
+          p_event_type: string
+          p_event_data: Json
+          p_metadata?: Json
+        }
+        Returns: string
+      }
       search_knowledge: {
         Args: {
           user_uuid: string
@@ -762,6 +1088,24 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      store_aws_credentials: {
+        Args: {
+          p_access_key_id: string
+          p_secret_access_key: string
+          p_region: string
+          p_topic_arn: string
+        }
+        Returns: undefined
+      }
+      update_mcp_oauth_token: {
+        Args: {
+          p_server_id: string
+          p_access_token: string
+          p_refresh_token?: string
+          p_expires_at?: string
+        }
+        Returns: string
       }
       vector_avg: {
         Args: { "": number[] }

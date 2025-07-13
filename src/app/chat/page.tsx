@@ -35,13 +35,14 @@ function ChatPageContent() {
   const handleNewChat = () => {
     // Clear current session to start fresh
     setCurrentSessionId(null)
-    router.push('/chat')
+    // Update URL without navigation
+    window.history.pushState({}, '', '/chat')
   }
 
   const handleSelectChat = async (threadId: string) => {
     try {
-      // Update URL and session
-      router.push(`/chat/${threadId}`)
+      // Update URL without causing a full navigation
+      window.history.pushState({}, '', `/chat/${threadId}`)
       setCurrentSessionId(threadId)
     } catch (error) {
       console.error('Failed to load thread:', error)
@@ -51,12 +52,12 @@ function ChatPageContent() {
   }
 
   const handleThreadCreated = useCallback((threadId: string) => {
-    // Update URL when a new thread is created
-    router.push(`/chat/${threadId}`)
+    // Update URL without causing a full navigation
+    window.history.pushState({}, '', `/chat/${threadId}`)
     setCurrentSessionId(threadId)
     // Trigger a single refresh of the thread list
     setRefreshThreads(prev => prev + 1)
-  }, [router])
+  }, [])
 
   if (loading) {
     return (

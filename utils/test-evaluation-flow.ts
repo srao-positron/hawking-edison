@@ -14,6 +14,10 @@ const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 const API_URL = 'http://localhost:3000/api'
 
+// Test user credentials
+const TEST_EMAIL = 'test@hawkingedison.com'
+const TEST_PASSWORD = 'TestUser123!@#'
+
 interface TestCase {
   name: string
   input: string
@@ -53,26 +57,33 @@ async function runTest(testCase: TestCase) {
   console.log(`   Input: "${testCase.input}"`)
   
   try {
-    // Create a test session
-    const response = await fetch(`${API_URL}/interact`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
-      },
-      body: JSON.stringify({ input: testCase.input })
+    // First, sign in as test user
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: TEST_EMAIL,
+      password: TEST_PASSWORD
     })
     
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`)
+    if (authError || !authData.session) {
+      throw new Error(`Authentication failed: ${authError?.message || 'No session'}`)
     }
     
-    const data = await response.json()
-    console.log(`   Session ID: ${data.data?.sessionId || data.sessionId}`)
+    // Call Edge Function directly instead of API route
+    const { data: response, error: edgeError } = await supabase.functions.invoke('interact', {
+      body: {
+        input: testCase.input,
+        userId: authData.user!.id
+      }
+    })
     
-    // Connect to Supabase to monitor the session
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    const sessionId = data.data?.sessionId || data.sessionId
+    if (edgeError) {
+      throw new Error(`Edge Function error: ${edgeError.message}`)
+    }
+    
+    console.log(`   Session ID: ${response.data?.sessionId || response.sessionId}`)
+    
+    // Connect to Supabase to monitor the session (reuse authenticated client)
+    const sessionId = response.data?.sessionId || response.sessionId
     
     // Subscribe to session updates
     return new Promise((resolve) => {
