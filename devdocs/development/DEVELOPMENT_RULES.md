@@ -766,3 +766,45 @@ type ApiKey = Database['public']['Tables']['api_keys']['Row']
 - Hours of debugging Edge Function failures
 
 **CRITICAL: If you change the database schema without syncing types, Edge Functions WILL fail in production!**
+
+---
+
+## Rule 27: AWS Infrastructure Deployment - Use deploy.sh ONLY
+
+**MANDATORY**: When deploying AWS infrastructure (CDK), you MUST use the deployment script:
+
+```bash
+# ✅ CORRECT - Uses deployment script
+cd infrastructure/cdk
+./deploy.sh
+
+# ❌ WRONG - Never use these directly
+npx cdk deploy        # Missing environment variables!
+npm run deploy        # Missing environment variables!
+cdk deploy           # Missing environment variables!
+```
+
+**The deployment script (`infrastructure/cdk/deploy.sh`):**
+- Loads environment variables from `.env.local`
+- Maps them to expected CDK environment variable names
+- Ensures Lambda functions receive all required secrets:
+  - `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY`
+  - `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`
+  - `VAULT_STORE_SERVICE_KEY`
+  - All other API credentials
+- Validates required variables before deployment
+- Prevents Lambda functions from failing due to missing secrets
+
+**Without using deploy.sh:**
+- Lambda functions will be missing critical environment variables
+- Orchestration will fail with "Cannot read properties of undefined"
+- API calls will fail with authentication errors
+- The entire system will be non-functional
+
+**If deployment fails:**
+1. Check that `.env.local` contains all required variables
+2. Ensure `deploy.sh` has execute permissions: `chmod +x deploy.sh`
+3. Review the deployment logs for specific errors
+4. Verify AWS credentials are configured
+
+**Remember: A Lambda without secrets is a broken Lambda!**
