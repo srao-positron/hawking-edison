@@ -6,6 +6,8 @@
 
 import { ToolDefinition, ToolExecutionContext } from './index'
 import { callLLMWithTools, LLMMessage } from '../llm-client'
+import { getAgentContext } from './agent'
+import { executeTool } from './index'
 
 export const interactionTools: ToolDefinition[] = [
   {
@@ -58,7 +60,10 @@ export const interactionTools: ToolDefinition[] = [
       // Run discussion rounds
       for (let round = 0; round < rounds; round++) {
         for (const agent of agents) {
-          // Generate agent's contribution
+          // Get available tools for agents
+          const { tools } = getAgentContext()
+          
+          // Generate agent's contribution with tool access
           const response = await callLLMWithTools(
             [
               ...messages,
@@ -66,16 +71,80 @@ export const interactionTools: ToolDefinition[] = [
                 role: 'user',
                 content: `What does ${agent.name || `Agent ${agent.id}`} say next in this ${style} discussion? 
                   Consider their persona: ${agent.persona || agent.specification}
-                  This is round ${round + 1} of ${rounds}.`
+                  This is round ${round + 1} of ${rounds}.
+                  
+                  You have access to tools if you need to look up information, analyze data, or take actions to support your points.`
               }
             ],
-            [],
+            Object.values(tools || {}),
             'claude'
           )
           
+          // Handle any tool calls made by the agent
+          let finalContent = response.content
+          if (response.tool_calls && response.tool_calls.length > 0) {
+            const toolResults = []
+            const { context } = getAgentContext()
+            
+            for (const toolCall of response.tool_calls) {
+              try {
+                let result: any
+                
+                // Check if this is an MCP tool
+                if (toolCall.name.startsWith('mcp_')) {
+                  // Execute via MCP proxy
+                  const mcpProxy = new (await import('../mcp-proxy')).MCPProxy(
+                    context!.supabase,
+                    context!.sessionId,
+                    undefined // No threadId for sub-agents
+                  )
+                  const originalToolName = toolCall.name.substring(4) // Remove 'mcp_' prefix
+                  result = await mcpProxy.executeTool(context!.userId, originalToolName, toolCall.arguments)
+                } else {
+                  // Execute regular tool
+                  result = await executeTool(toolCall.name, toolCall.arguments, context!)
+                }
+                
+                toolResults.push({
+                  tool: toolCall.name,
+                  result: result
+                })
+              } catch (error) {
+                toolResults.push({
+                  tool: toolCall.name,
+                  error: error instanceof Error ? error.message : 'Tool execution failed'
+                })
+              }
+            }
+            
+            // Get the agent's final response after using tools
+            const finalResponse = await callLLMWithTools(
+              [
+                ...messages,
+                {
+                  role: 'assistant',
+                  content: response.content,
+                  tool_calls: response.tool_calls
+                },
+                {
+                  role: 'tool',
+                  content: JSON.stringify(toolResults)
+                },
+                {
+                  role: 'user',
+                  content: `Based on the tool results, what is ${agent.name || agent.id}'s contribution to the discussion?`
+                }
+              ],
+              [],
+              'claude'
+            )
+            
+            finalContent = finalResponse.content
+          }
+          
           const contribution = {
             agent: agent.name || agent.id,
-            content: response.content,
+            content: finalContent,
             round: round + 1,
             timestamp: new Date().toISOString()
           }
@@ -142,19 +211,84 @@ export const interactionTools: ToolDefinition[] = [
           : `You are ${agent.name || agent.id} with persona: ${agent.persona || agent.specification}
              Respond naturally and authentically to the prompt.`
         
+        // Get available tools for agents
+        const { tools } = getAgentContext()
+        
         const response = await callLLMWithTools(
           [
             { role: 'system', content: systemPrompt },
-            { role: 'user', content: prompt }
+            { role: 'user', content: prompt + '\n\nYou have access to tools if you need to research, analyze data, or gather information for your response.' }
           ],
-          [],
+          Object.values(tools || {}),
           'claude'
         )
+        
+        // Handle any tool calls made by the agent
+        let finalContent = response.content
+        if (response.tool_calls && response.tool_calls.length > 0) {
+          const toolResults = []
+          const { context } = getAgentContext()
+          
+          for (const toolCall of response.tool_calls) {
+            try {
+              let result: any
+              
+              // Check if this is an MCP tool
+              if (toolCall.name.startsWith('mcp_')) {
+                // Execute via MCP proxy
+                const mcpProxy = new (await import('../mcp-proxy')).MCPProxy(
+                  context!.supabase,
+                  context!.sessionId,
+                  undefined // No threadId for sub-agents
+                )
+                const originalToolName = toolCall.name.substring(4) // Remove 'mcp_' prefix
+                result = await mcpProxy.executeTool(context!.userId, originalToolName, toolCall.arguments)
+              } else {
+                // Execute regular tool
+                result = await executeTool(toolCall.name, toolCall.arguments, context!)
+              }
+              
+              toolResults.push({
+                tool: toolCall.name,
+                result: result
+              })
+            } catch (error) {
+              toolResults.push({
+                tool: toolCall.name,
+                error: error instanceof Error ? error.message : 'Tool execution failed'
+              })
+            }
+          }
+          
+          // Get the agent's final response after using tools
+          const finalResponse = await callLLMWithTools(
+            [
+              { role: 'system', content: systemPrompt },
+              {
+                role: 'assistant',
+                content: response.content,
+                tool_calls: response.tool_calls
+              },
+              {
+                role: 'tool',
+                content: JSON.stringify(toolResults)
+              },
+              {
+                role: 'user',
+                content: 'Based on your tool results, provide your final response to the original prompt.'
+              }
+            ],
+            [],
+            'claude'
+          )
+          
+          finalContent = finalResponse.content
+        }
         
         return {
           agent: agent.name || agent.id,
           agentId: agent.id,
-          response: response.content,
+          response: finalContent,
           timestamp: new Date().toISOString()
         }
       })
@@ -243,16 +377,19 @@ export const interactionTools: ToolDefinition[] = [
       
       // Conduct interview with follow-ups
       for (let i = 0; i < depth + 1; i++) {
-        // Get answer
+        // Get available tools for agents
+        const { tools } = getAgentContext()
+        
+        // Get answer with tool access
         const answer = await callLLMWithTools(
           [
             ...messages,
             {
               role: 'user',
-              content: `How does ${interviewee.name || 'the interviewee'} respond to this question?`
+              content: `How does ${interviewee.name || 'the interviewee'} respond to this question? You have access to tools if you need to look up information or verify facts.`
             }
           ],
-          [],
+          Object.values(tools || {}),
           'claude'
         )
         

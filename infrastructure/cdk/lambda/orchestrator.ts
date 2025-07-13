@@ -8,6 +8,7 @@ import { getToolDefinitions, executeTool, ToolExecutionContext } from './tools'
 import { verify } from './tools/verification'
 import { generateHumanId } from './human-id'
 import { MCPProxy } from './mcp-proxy'
+import { setAgentContext } from './tools/agent'
 
 const sns = new SNSClient({ region: process.env.AWS_REGION })
 const secretsManager = new SecretsManagerClient({ region: process.env.AWS_REGION })
@@ -495,6 +496,9 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
         }
         
         console.log(`Available tools: ${Object.keys(baseTools).length} base, ${Object.keys(mcpToolsFormatted).length} MCP`)
+        
+        // Set agent context so all agents have access to tools
+        setAgentContext(context, tools)
         
         // Check if we need to handle message compaction
         const needsCompression = session.tool_state?.needs_compression || false

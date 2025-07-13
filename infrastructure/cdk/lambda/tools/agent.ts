@@ -8,10 +8,23 @@
 import { ToolDefinition, ToolExecutionContext } from './index'
 import { callLLMWithTools } from '../llm-client'
 
+// Store the context and tools for all agents to use
+let globalContext: ToolExecutionContext | null = null
+let availableTools: Record<string, ToolDefinition> = {}
+
+export function setAgentContext(context: ToolExecutionContext, tools: Record<string, ToolDefinition>) {
+  globalContext = context
+  availableTools = tools
+}
+
+export function getAgentContext() {
+  return { context: globalContext, tools: availableTools }
+}
+
 export const agentTools: ToolDefinition[] = [
   {
     name: 'createAgent',
-    description: 'Create an agent with any persona, expertise, or perspective. The agent can think, respond, and participate in interactions.',
+    description: 'Create an agent with any persona, expertise, or perspective. The agent has full access to all tools and can think, respond, research, and take actions.',
     parameters: {
       type: 'object',
       properties: {
@@ -42,7 +55,9 @@ export const agentTools: ToolDefinition[] = [
               - Communication style
               - Biases and perspectives
               - How they approach problems
+              - How they would use tools (search, analysis, creation, etc.)
               
+              Note: This agent will have access to all available tools including search, data analysis, GitHub operations, and more.
               Return a detailed persona description.`
           },
           {
