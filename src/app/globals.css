@@ -7,3 +7,12 @@ body {
   color: #000000;
   background: #ffffff;
 }
+
+/* Animation delay utilities */
+.delay-100 {
+  animation-delay: 100ms;
+}
+
+.delay-200 {
+  animation-delay: 200ms;
+}

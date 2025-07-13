@@ -35,76 +35,8 @@ interface MCPExecutionLog {
   duration_ms?: number
 }
 
-// Simple in-memory cache with TTL
-class SimpleCache {
-  private cache: Map<string, { data: any; expires: number }> = new Map()
-  
-  get(key: string): any | null {
-    const item = this.cache.get(key)
-    if (!item) return null
-    
-    if (Date.now() > item.expires) {
-      this.cache.delete(key)
-      return null
-    }
-    
-    return item.data
-  }
-  
-  set(key: string, data: any, ttlMs: number = 60000): void {
-    this.cache.set(key, {
-      data,
-      expires: Date.now() + ttlMs
-    })
-  }
-  
-  clear(): void {
-    this.cache.clear()
-  }
-}
-
-// Global cache instance
-const mcpCache = new SimpleCache()
-
-// Helper function to make HTTPS requests with timeout and retry
-async function httpsRequestWithRetry(
-  url: string, 
-  options: any, 
-  body: string, 
-  timeout: number = 10000,
-  maxRetries: number = 3
-): Promise<any> {
-  let lastError: Error | null = null
-  
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      if (attempt > 0) {
-        // Exponential backoff: 1s, 2s, 4s
-        const delay = Math.pow(2, attempt - 1) * 1000
-        console.log(`Retrying after ${delay}ms (attempt ${attempt + 1}/${maxRetries})`)
-        await new Promise(resolve => setTimeout(resolve, delay))
-      }
-      
-      return await httpsRequest(url, options, body, timeout)
-    } catch (error) {
-      lastError = error as Error
-      console.error(`Attempt ${attempt + 1} failed:`, error)
-      
-      // Don't retry on certain errors
-      if (error instanceof Error && (
-        error.message.includes('tool not found') ||
-        error.message.includes('Unauthorized')
-      )) {
-        throw error
-      }
-    }
-  }
-  
-  throw lastError || new Error('All retry attempts failed')
-}
-
 // Helper function to make HTTPS requests with timeout
-function httpsRequest(url: string, options: any, body: string, timeout: number = 10000): Promise<any> {
+function httpsRequest(url: string, options: any, body: string, timeout: number = 5000): Promise<any> {
   return new Promise((resolve, reject) => {
     const urlParts = new URL(url)
     const reqOptions = {
@@ -126,15 +58,7 @@ function httpsRequest(url: string, options: any, body: string, timeout: number =
       res.on('end', () => {
         try {
           const parsed = JSON.parse(data)
-          
-          // Check for rate limiting
-          if (res.statusCode === 429) {
-            const retryAfter = res.headers['retry-after'] || '5'
-            reject(new Error(`Rate limited. Retry after ${retryAfter} seconds`))
-            return
-          }
-          
-          resolve({ status: res.statusCode, data: parsed, headers: res.headers })
+          resolve({ status: res.statusCode, data: parsed })
         } catch (e) {
           reject(new Error(`Failed to parse response: ${data}`))
         }
@@ -204,18 +128,6 @@ export class MCPProxy {
     let logEntry: MCPExecutionLog | null = null
     
     try {
-      // Create cache key for read operations
-      const cacheKey = `${toolName}:${JSON.stringify(parameters)}`
-      
-      // Check cache for read operations (like get_file_contents)
-      if (toolName.includes('get_') || toolName.includes('list_') || toolName.includes('search_')) {
-        const cached = mcpCache.get(cacheKey)
-        if (cached) {
-          console.log(`Cache hit for ${toolName}`)
-          return cached
-        }
-      }
-      
       // Find the tool
       const { data: tool, error: toolError } = await this.supabase
         .from('mcp_tools')
@@ -308,8 +220,8 @@ export class MCPProxy {
 
       console.log(`Calling MCP tool ${toolName} at ${baseUrl}`)
       
-      // Use the improved HTTPS request with retry and timeout
-      const response = await httpsRequestWithRetry(
+      // Use the custom HTTPS request with timeout
+      const response = await httpsRequest(
         baseUrl,
         {
           method: 'POST',
@@ -319,8 +231,7 @@ export class MCPProxy {
           }
         },
         requestBody,
-        15000, // 15 second timeout
-        3      // 3 retries
+        10000 // 10 second timeout
       )
       
       const duration = Date.now() - startTime
@@ -353,38 +264,6 @@ export class MCPProxy {
             duration_ms: duration
           })
           .eq('id', logEntry.id)
-      }
-      
-      // Cache successful read operations based on response headers
-      if (toolName.includes('get_') || toolName.includes('list_') || toolName.includes('search_')) {
-        let ttl = 60000 // Default 1 minute
-        
-        // Parse Cache-Control header if present
-        const cacheControl = response.headers['cache-control']
-        if (cacheControl) {
-          const maxAgeMatch = cacheControl.match(/max-age=(\d+)/)
-          if (maxAgeMatch) {
-            ttl = parseInt(maxAgeMatch[1]) * 1000 // Convert seconds to milliseconds
-          } else if (cacheControl.includes('no-cache') || cacheControl.includes('no-store')) {
-            ttl = 0 // Don't cache
-          }
-        }
-        
-        // Check for Expires header as fallback
-        if (!cacheControl && response.headers['expires']) {
-          const expires = new Date(response.headers['expires']).getTime()
-          const now = Date.now()
-          if (expires > now) {
-            ttl = expires - now
-          }
-        }
-        
-        // Set reasonable limits (min 10s, max 1 hour)
-        if (ttl > 0) {
-          ttl = Math.max(10000, Math.min(ttl, 3600000))
-          mcpCache.set(cacheKey, responseData.result, ttl)
-          console.log(`Cached ${toolName} for ${ttl/1000}s`)
-        }
       }
       
       // Log success as orchestration event

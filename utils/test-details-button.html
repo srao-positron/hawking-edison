@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Details Button Visibility</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        .test { margin: 20px 0; padding: 20px; border: 1px solid #ddd; }
+        .pass { background-color: #d4edda; }
+        .fail { background-color: #f8d7da; }
+        code { background-color: #f4f4f4; padding: 2px 4px; }
+    </style>
+</head>
+<body>
+    <h1>Details Button Visibility Test</h1>
+    
+    <div class="test">
+        <h2>Test Case 1: Successful Orchestration (swift-fog-785)</h2>
+        <p>Expected: Details button visible on page load and refresh ✅</p>
+        <p>Actual: Check browser console logs for:</p>
+        <ul>
+            <li><code>orchestrationSessionId: a3f25a0c-52e2-4c73-bf0c-16d6303994dc</code></li>
+            <li><code>willShowDetails: true</code></li>
+        </ul>
+    </div>
+    
+    <div class="test">
+        <h2>Test Case 2: Failed Orchestration (ready-rain-339)</h2>
+        <p>Expected: No Details button (no assistant message) ✅</p>
+        <p>Actual: Orchestration failed, no assistant message saved</p>
+    </div>
+    
+    <div class="test">
+        <h2>Test Case 3: Running Orchestration</h2>
+        <p>Expected: Details button visible while running ✅</p>
+        <p>Actual: In-memory "thinking" message has orchestrationSessionId</p>
+    </div>
+    
+    <h2>Root Cause Analysis</h2>
+    <ol>
+        <li><strong>Successful orchestrations:</strong> Assistant message saved with metadata.orchestration_session_id</li>
+        <li><strong>Failed orchestrations:</strong> No assistant message saved, so no Details button on refresh</li>
+        <li><strong>Running orchestrations:</strong> Temporary "thinking" message shown with Details button</li>
+    </ol>
+    
+    <h2>Solution</h2>
+    <p>The current implementation is correct. The issue with ready-rain-339 is that the orchestration failed.</p>
+    <p>To improve UX, we should:</p>
+    <ol>
+        <li>Save a failed message with orchestrationSessionId when orchestration fails</li>
+        <li>Show error state in the orchestration panel</li>
+        <li>Allow viewing failed orchestration details</li>
+    </ol>
+</body>
+</html>

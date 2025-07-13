@@ -69,6 +69,20 @@ export const agentTools: ToolDefinition[] = [
         'claude'
       )
       
+      // Log agent creation event
+      if (context.supabase) {
+        await context.supabase.rpc('log_orchestration_event', {
+          p_session_id: context.sessionId,
+          p_event_type: 'agent_created',
+          p_event_data: {
+            agent_id: agentId,
+            name: args.name || `Agent ${agentId}`,
+            specification: args.specification,
+            persona_preview: personaResponse.content?.substring(0, 200) + '...'
+          }
+        })
+      }
+      
       return {
         id: agentId,
         name: args.name,

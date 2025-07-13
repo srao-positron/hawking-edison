@@ -280,17 +280,28 @@ async function completeSession(supabase: any, session: Session, response: string
     })
   }
   
-  const { error } = await supabase
-    .from('orchestration_sessions')
-    .update({ final_response: finalResponseWithThread })
-    .eq('id', session.id)
-  
-  if (error) {
-    throw new Error(`Failed to update final response: ${error.message}`)
+  try {
+    const { error } = await supabase
+      .from('orchestration_sessions')
+      .update({ final_response: finalResponseWithThread })
+      .eq('id', session.id)
+    
+    if (error) {
+      console.error(`Failed to update final response: ${error.message}`)
+      // Don't throw here - we've already saved the messages
+    }
+  } catch (updateError) {
+    console.error('Error updating final response:', updateError)
+    // Continue - the important part (messages) has been saved
   }
   
   // Remove from active sessions
-  await removeActiveSession(session.id)
+  try {
+    await removeActiveSession(session.id)
+  } catch (removeError) {
+    console.error('Error removing active session:', removeError)
+    // Non-critical error, continue
+  }
 }
 
 // Handle timeout by queueing resumption
@@ -335,6 +346,48 @@ async function handleError(supabase: any, sessionId: string, error: any) {
     console.error('Failed to log error event:', logError)
   }
   
+  // Load session to get user_id and thread info
+  let session: Session | null = null
+  try {
+    session = await loadSession(supabase, sessionId)
+  } catch (loadError) {
+    console.error('Failed to load session for error handling:', loadError)
+  }
+  
+  // Create error message in chat thread if we have session info
+  if (session && session.tool_state?.thread_id) {
+    try {
+      // Try to extract any partial response from the session messages
+      const assistantMessages = session.messages?.filter((m: any) => m.role === 'assistant' && m.content) || []
+      const lastResponse = assistantMessages[assistantMessages.length - 1]?.content || 
+                          'I encountered an error while processing your request. The operation may have partially completed.'
+      
+      // Save error message to chat thread
+      const { error: msgError } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: session.tool_state.thread_id,
+          user_id: session.user_id,
+          role: 'assistant',
+          content: `${lastResponse}\n\n*Error: ${error.message || 'Unknown error occurred'}*`,
+          metadata: { 
+            orchestration_session_id: sessionId,
+            error: true,
+            error_message: error.message 
+          },
+          created_at: new Date().toISOString()
+        })
+      
+      if (msgError) {
+        console.error('Failed to save error message:', msgError)
+      } else {
+        console.log('Saved error message to chat thread')
+      }
+    } catch (saveError) {
+      console.error('Failed to save error message to thread:', saveError)
+    }
+  }
+  
   const { error: updateError } = await supabase
     .from('orchestration_sessions')
     .update({
@@ -362,43 +415,86 @@ async function executeToolWithTimeout(
 ): Promise<string> {
   console.log(`Executing tool ${toolCall.name} with ${remainingTime}ms remaining`)
   
-  try {
-    let result: any
-    
-    // Check if this is an MCP tool
-    if (toolCall.name.startsWith('mcp_')) {
-      // Execute via MCP proxy
-      const mcpProxy = new MCPProxy(context.supabase, context.sessionId, context.threadId)
-      const originalToolName = toolCall.name.substring(4) // Remove 'mcp_' prefix
-      result = await mcpProxy.executeTool(context.userId, originalToolName, toolCall.arguments)
-    } else {
-      // Create tool execution context for regular tools
-      const toolContext: ToolExecutionContext = {
-        supabase: context.supabase,
-        userId: context.userId,
-        sessionId: context.sessionId
+  // Implement timeout wrapper
+  const timeoutPromise = new Promise<string>((_, reject) => {
+    setTimeout(() => reject(new Error(`Tool execution timeout after ${remainingTime}ms`)), remainingTime)
+  })
+  
+  const executionPromise = async (): Promise<string> => {
+    try {
+      let result: any
+      
+      // Check if this is an MCP tool
+      if (toolCall.name.startsWith('mcp_')) {
+        // Execute via MCP proxy
+        const mcpProxy = new MCPProxy(context.supabase, context.sessionId, context.threadId)
+        const originalToolName = toolCall.name.substring(4) // Remove 'mcp_' prefix
+        result = await mcpProxy.executeTool(context.userId, originalToolName, toolCall.arguments)
+      } else {
+        // Create tool execution context for regular tools
+        const toolContext: ToolExecutionContext = {
+          supabase: context.supabase,
+          userId: context.userId,
+          sessionId: context.sessionId
+        }
+        
+        // Execute the regular tool
+        result = await executeTool(toolCall.name, toolCall.arguments, toolContext)
       }
       
-      // Execute the regular tool
-      result = await executeTool(toolCall.name, toolCall.arguments, toolContext)
+      // Verify the tool execution achieved its goal
+      const toolGoal = `Execute ${toolCall.name} with arguments: ${JSON.stringify(toolCall.arguments)}`
+      const verification = await verify(result, toolGoal, 'agent')
+      
+      // Include verification in result
+      return JSON.stringify({
+        status: 'completed',
+        result,
+        verification
+      })
+    } catch (error) {
+      console.error(`Error executing tool ${toolCall.name}:`, error)
+      
+      // Provide detailed error information for the LLM
+      const errorDetails: any = {
+        status: 'error',
+        error: error instanceof Error ? error.message : 'Unknown error',
+        tool: toolCall.name,
+        arguments: toolCall.arguments
+      }
+      
+      // Add specific error types to help LLM understand
+      if (error instanceof Error) {
+        if (error.message.includes('not found')) {
+          errorDetails.errorType = 'NotFound'
+          errorDetails.suggestion = 'The requested resource was not found. Check if the parameters are correct.'
+        } else if (error.message.includes('unauthorized') || error.message.includes('401')) {
+          errorDetails.errorType = 'Unauthorized'
+          errorDetails.suggestion = 'Authentication failed. The tool may require different permissions.'
+        } else if (error.message.includes('rate limit')) {
+          errorDetails.errorType = 'RateLimit'
+          errorDetails.suggestion = 'Rate limit exceeded. Try again after a short delay.'
+        } else if (error.message.includes('timeout')) {
+          errorDetails.errorType = 'Timeout'
+          errorDetails.suggestion = 'The operation timed out. Consider breaking it into smaller steps.'
+        }
+      }
+      
+      return JSON.stringify(errorDetails)
     }
-    
-    // Verify the tool execution achieved its goal
-    const toolGoal = `Execute ${toolCall.name} with arguments: ${JSON.stringify(toolCall.arguments)}`
-    const verification = await verify(result, toolGoal, 'agent')
-    
-    // Include verification in result
-    return JSON.stringify({
-      status: 'completed',
-      result,
-      verification
-    })
+  }
+  
+  // Race between execution and timeout
+  try {
+    return await Promise.race([executionPromise(), timeoutPromise])
   } catch (error) {
-    console.error(`Error executing tool ${toolCall.name}:`, error)
+    // Timeout occurred
     return JSON.stringify({
       status: 'error',
-      error: error instanceof Error ? error.message : 'Unknown error',
-      tool: toolCall.name
+      error: error instanceof Error ? error.message : 'Tool execution timeout',
+      errorType: 'Timeout',
+      tool: toolCall.name,
+      suggestion: 'The tool execution timed out. Consider using simpler parameters or breaking the task into smaller steps.'
     })
   }
 }
@@ -472,6 +568,9 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
           return
         }
         
+        // Get threadId from session's tool_state if it exists
+        const threadId = session.tool_state?.thread_id || undefined
+        
         // Create context for tool execution
         const context = {
           sessionId: session.id,
@@ -482,7 +581,13 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
         }
         
         // Get available tools
-        const baseTools = getToolDefinitions()
+        const baseToolsArray = getToolDefinitions()
+        
+        // Convert base tools array to object keyed by name
+        const baseTools: Record<string, any> = {}
+        baseToolsArray.forEach(tool => {
+          baseTools[tool.name] = tool
+        })
         
         // Get MCP tools for this user
         const mcpProxy = new MCPProxy(supabase, session.id, threadId)
@@ -562,7 +667,14 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
           
           Use tools as needed to accomplish the user's goal.
           Be creative in how you combine tools.
-          Verify your work achieves the intended outcome.`
+          Verify your work achieves the intended outcome.
+          
+          IMPORTANT: Tool Error Handling
+          - If a tool fails, you will receive an error message with details
+          - You can retry failed tools with different parameters
+          - You have up to 3 retry attempts per tool
+          - Consider alternative approaches if a tool consistently fails
+          - Always explain to the user if you cannot complete a task due to tool failures`
         }
         
         // Add system message if not present
@@ -579,7 +691,7 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
           console.log(`  ${i}: ${msg.role} - ${msg.content ? msg.content.substring(0, 100) : 'tool calls'}`);
         })
         
-        const response = await callLLMWithTools(messagesToSend, tools)
+        const response = await callLLMWithTools(messagesToSend, Object.values(tools))
         
         if (response.toolCalls && response.toolCalls.length > 0) {
           // Execute tools
@@ -601,45 +713,65 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
             const result = await executeToolWithTimeout(toolCall, remainingTime, context)
             const toolDuration = Date.now() - startToolTime
             
-            // Log tool result event
+            // Parse the result to check status
+            let resultData: any
+            let toolSucceeded = false
+            
             try {
-              const resultData = JSON.parse(result)
-              await supabase.rpc('log_orchestration_event', {
-                p_session_id: session.id,
-                p_event_type: 'tool_result',
-                p_event_data: {
-                  tool: toolCall.name,
-                  tool_call_id: toolCall.id,
-                  success: resultData.status === 'completed',
-                  result: resultData,
-                  duration_ms: toolDuration
-                }
-              })
+              resultData = JSON.parse(result)
+              toolSucceeded = resultData.status === 'completed'
             } catch (e) {
-              // Log error if result parsing fails
-              await supabase.rpc('log_orchestration_event', {
-                p_session_id: session.id,
-                p_event_type: 'tool_result',
-                p_event_data: {
-                  tool: toolCall.name,
-                  tool_call_id: toolCall.id,
-                  success: false,
-                  error: 'Failed to parse result',
-                  duration_ms: toolDuration
-                }
-              })
+              // If parsing fails, treat as error
+              resultData = {
+                status: 'error',
+                error: 'Failed to parse tool result',
+                rawResult: result
+              }
             }
             
-            // Add to conversation
+            // Log tool result event
+            await supabase.rpc('log_orchestration_event', {
+              p_session_id: session.id,
+              p_event_type: 'tool_result',
+              p_event_data: {
+                tool: toolCall.name,
+                tool_call_id: toolCall.id,
+                success: toolSucceeded,
+                result: toolSucceeded ? resultData.result : undefined,
+                error: !toolSucceeded ? (resultData.error || 'Tool execution failed') : undefined,
+                duration_ms: toolDuration
+              }
+            })
+            
+            // Add to conversation - ALWAYS include tool results, even errors
+            // This allows the LLM to see what went wrong and potentially retry
             session.messages.push({
               role: 'assistant',
               content: null,
               toolCalls: [toolCall]
             })
+            
+            // Format the tool result message
+            let toolResultMessage: string
+            if (toolSucceeded) {
+              toolResultMessage = JSON.stringify({
+                status: 'success',
+                result: resultData.result
+              })
+            } else {
+              // Provide clear error feedback to the LLM
+              toolResultMessage = JSON.stringify({
+                status: 'error',
+                error: resultData.error || 'Unknown error',
+                message: 'The tool call failed. You may retry with different parameters or try an alternative approach.',
+                details: resultData
+              })
+            }
+            
             session.messages.push({
               role: 'tool',
               toolCallId: toolCall.id,
-              content: result
+              content: toolResultMessage
             })
             
             // Save progress after each tool

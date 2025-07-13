@@ -80,6 +80,21 @@ export const interactionTools: ToolDefinition[] = [
             'claude'
           )
           
+          // Log agent thought if they're processing something
+          if (context.supabase && response.content) {
+            await context.supabase.rpc('log_orchestration_event', {
+              p_session_id: context.sessionId,
+              p_event_type: 'agent_thought',
+              p_event_data: {
+                agent_id: agent.id,
+                agent_name: agent.name || agent.id,
+                thought: response.content,
+                is_key_decision: response.tool_calls && response.tool_calls.length > 0,
+                thought_type: 'discussion_contribution'
+              }
+            })
+          }
+          
           // Handle any tool calls made by the agent
           let finalContent = response.content
           if (response.tool_calls && response.tool_calls.length > 0) {
@@ -150,6 +165,22 @@ export const interactionTools: ToolDefinition[] = [
           }
           
           discussion.push(contribution)
+          
+          // Log discussion turn event
+          if (context.supabase) {
+            await context.supabase.rpc('log_orchestration_event', {
+              p_session_id: context.sessionId,
+              p_event_type: 'discussion_turn',
+              p_event_data: {
+                agent_id: agent.id,
+                agent_name: agent.name || agent.id,
+                message: finalContent,
+                round: round + 1,
+                topic: topic,
+                style: style
+              }
+            })
+          }
           
           // Add to context for next speaker
           messages.push({
