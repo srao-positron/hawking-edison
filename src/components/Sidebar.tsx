@@ -240,7 +240,7 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
             </div>
           )}
           <Link
-            href="/settings/api-keys"
+            href="/settings"
             className="flex items-center gap-2 px-3 py-2 text-sm rounded-lg hover:bg-gray-100 transition-colors"
           >
             <span className="text-gray-600">⚙️</span>

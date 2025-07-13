@@ -13,7 +13,14 @@ interface MCPListToolsResponse {
 }
 
 interface MCPListDataSourcesResponse {
-  dataSources: Array<{
+  resources?: Array<{
+    name: string
+    description?: string
+    uri?: string
+    mimeType?: string
+  }>
+  // Backwards compatibility
+  dataSources?: Array<{
     name: string
     description?: string
     schema?: any
@@ -61,19 +68,32 @@ async function processEnumeration(serverId: string, userId: string) {
 
   console.log(`[MCP] Enumerating tools for server ${server.name}`)
 
-  // List tools
+  // List tools using JSON-RPC format
   try {
-    const toolsResponse = await fetch(`${baseUrl}tools/list`, {
+    const toolsResponse = await fetch(baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...headers
       },
-      body: JSON.stringify({})
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'tools/list',
+        params: {},
+        id: 1
+      })
     })
 
     if (toolsResponse.ok) {
-      const toolsData: MCPListToolsResponse = await toolsResponse.json()
+      const responseData = await toolsResponse.json()
+      
+      // Check for JSON-RPC error
+      if (responseData.error) {
+        console.error('JSON-RPC error:', responseData.error)
+        throw new Error(responseData.error.message)
+      }
+      
+      const toolsData: MCPListToolsResponse = responseData.result
       
       // Clear existing tools
       await supabase
@@ -109,44 +129,58 @@ async function processEnumeration(serverId: string, userId: string) {
     console.error('Error listing tools:', error)
   }
 
-  // List data sources
+  // List data sources using JSON-RPC format
   try {
-    const dataSourcesResponse = await fetch(`${baseUrl}datasources/list`, {
+    const dataSourcesResponse = await fetch(baseUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         ...headers
       },
-      body: JSON.stringify({})
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        method: 'resources/list',
+        params: {},
+        id: 2
+      })
     })
 
     if (dataSourcesResponse.ok) {
-      const dataSourcesData: MCPListDataSourcesResponse = await dataSourcesResponse.json()
+      const responseData = await dataSourcesResponse.json()
       
-      // Clear existing data sources
-      await supabase
-        .from('mcp_data_sources')
-        .delete()
-        .eq('mcp_server_id', serverId)
-
-      // Insert new data sources
-      if (dataSourcesData.dataSources && dataSourcesData.dataSources.length > 0) {
-        const sourcesToInsert = dataSourcesData.dataSources.map(source => ({
-          mcp_server_id: serverId,
-          name: source.name,
-          description: source.description || null,
-          schema: source.schema || null,
-          metadata: {}
-        }))
-
-        const { error: insertError } = await supabase
+      // Check for JSON-RPC error
+      if (responseData.error) {
+        console.error('JSON-RPC error for data sources:', responseData.error)
+        // Don't throw here, data sources might not be supported
+      } else if (responseData.result) {
+        const dataSourcesData: MCPListDataSourcesResponse = responseData.result
+        
+        // Clear existing data sources
+        await supabase
           .from('mcp_data_sources')
-          .insert(sourcesToInsert)
+          .delete()
+          .eq('mcp_server_id', serverId)
 
-        if (insertError) {
-          console.error('Failed to insert data sources:', insertError)
-        } else {
-          console.log(`[MCP] Inserted ${sourcesToInsert.length} data sources`)
+        // Insert new data sources (handle both resources and dataSources)
+        const resources = dataSourcesData.resources || dataSourcesData.dataSources || []
+        if (resources.length > 0) {
+          const sourcesToInsert = resources.map((source: any) => ({
+            mcp_server_id: serverId,
+            name: source.name,
+            description: source.description || null,
+            schema: source.schema || source.uri ? { uri: source.uri, mimeType: source.mimeType } : null,
+            metadata: {}
+          }))
+
+          const { error: insertError } = await supabase
+            .from('mcp_data_sources')
+            .insert(sourcesToInsert)
+
+          if (insertError) {
+            console.error('Failed to insert data sources:', insertError)
+          } else {
+            console.log(`[MCP] Inserted ${sourcesToInsert.length} data sources`)
+          }
         }
       }
     } else {

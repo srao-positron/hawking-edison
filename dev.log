@@ -117,3 +117,18 @@
  GET /chat/wise-fog-86 200 in 14ms
  ✓ Compiled in 291ms (1400 modules)
  GET /chat/wise-fog-86 200 in 20ms
+   Reload env: .env.local
+ ✓ Compiled in 349ms (3523 modules)
+   Reload env: .env.local
+ ✓ Compiled in 201ms (3523 modules)
+ ✓ Compiled in 252ms (3523 modules)
+ ○ Compiling /settings/api-keys ...
+ ✓ Compiled /settings/api-keys in 1432ms (3578 modules)
+ GET /settings/api-keys 200 in 1670ms
+ ✓ Compiled /_not-found in 368ms (3582 modules)
+ GET /_next/static/chunks/app/(with-nav)/UnstyledButton.module.css.mjs.map 404 in 478ms
+ GET /settings/api-keys 200 in 276ms
+ GET /_next/static/chunks/app/(with-nav)/UnstyledButton.module.css.mjs.map 404 in 18ms
+ GET /.well-known/appspecific/com.chrome.devtools.json 404 in 15ms
+ GET /_next/static/chunks/app/VisuallyHidden.module.css.mjs.map 404 in 30ms
+[?25h

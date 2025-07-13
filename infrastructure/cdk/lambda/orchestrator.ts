@@ -7,6 +7,7 @@ import { callLLMWithTools, LLMMessage } from './llm-client'
 import { getToolDefinitions, executeTool, ToolExecutionContext } from './tools'
 import { verify } from './tools/verification'
 import { generateHumanId } from './human-id'
+import { MCPProxy } from './mcp-proxy'
 
 const sns = new SNSClient({ region: process.env.AWS_REGION })
 const secretsManager = new SecretsManagerClient({ region: process.env.AWS_REGION })
@@ -356,20 +357,30 @@ async function handleError(supabase: any, sessionId: string, error: any) {
 async function executeToolWithTimeout(
   toolCall: ToolCall, 
   remainingTime: number,
-  context: { sessionId: string; supabase: any; shouldYield: () => boolean; userId: string }
+  context: { sessionId: string; supabase: any; shouldYield: () => boolean; userId: string; threadId?: string }
 ): Promise<string> {
   console.log(`Executing tool ${toolCall.name} with ${remainingTime}ms remaining`)
   
   try {
-    // Create tool execution context
-    const toolContext: ToolExecutionContext = {
-      supabase: context.supabase,
-      userId: context.userId,
-      sessionId: context.sessionId
-    }
+    let result: any
     
-    // Execute the tool
-    const result = await executeTool(toolCall.name, toolCall.arguments, toolContext)
+    // Check if this is an MCP tool
+    if (toolCall.name.startsWith('mcp_')) {
+      // Execute via MCP proxy
+      const mcpProxy = new MCPProxy(context.supabase, context.sessionId, context.threadId)
+      const originalToolName = toolCall.name.substring(4) // Remove 'mcp_' prefix
+      result = await mcpProxy.executeTool(context.userId, originalToolName, toolCall.arguments)
+    } else {
+      // Create tool execution context for regular tools
+      const toolContext: ToolExecutionContext = {
+        supabase: context.supabase,
+        userId: context.userId,
+        sessionId: context.sessionId
+      }
+      
+      // Execute the regular tool
+      result = await executeTool(toolCall.name, toolCall.arguments, toolContext)
+    }
     
     // Verify the tool execution achieved its goal
     const toolGoal = `Execute ${toolCall.name} with arguments: ${JSON.stringify(toolCall.arguments)}`
@@ -465,11 +476,25 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
           sessionId: session.id,
           supabase,
           shouldYield: () => (Date.now() - startTime) > MAX_EXECUTION_TIME - TIMEOUT_BUFFER,
-          userId: session.user_id
+          userId: session.user_id,
+          threadId: threadId
         }
         
         // Get available tools
-        const tools = getToolDefinitions()
+        const baseTools = getToolDefinitions()
+        
+        // Get MCP tools for this user
+        const mcpProxy = new MCPProxy(supabase, session.id, threadId)
+        const mcpTools = await mcpProxy.getAvailableTools(session.user_id)
+        const mcpToolsFormatted = MCPProxy.formatToolsForRegistry(mcpTools)
+        
+        // Combine base tools with MCP tools
+        const tools = {
+          ...baseTools,
+          ...mcpToolsFormatted
+        }
+        
+        console.log(`Available tools: ${Object.keys(baseTools).length} base, ${Object.keys(mcpToolsFormatted).length} MCP`)
         
         // Check if we need to handle message compaction
         const needsCompression = session.tool_state?.needs_compression || false
