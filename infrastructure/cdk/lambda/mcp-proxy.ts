@@ -1,5 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js'
-import https from 'https'
+import * as https from 'https'
 import { URL } from 'url'
 
 interface MCPServer {

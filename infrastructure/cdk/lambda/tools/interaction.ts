@@ -86,12 +86,12 @@ export const interactionTools: ToolDefinition[] = [
               p_session_id: context.sessionId,
               p_event_type: 'thinking',
               p_event_data: {
-                content: response.content,
+                content: response.content || null,
                 step: 'agent_discussion',
                 agent_context: {
                   agent_id: agent.id,
                   agent_name: agent.name || agent.id,
-                  is_key_decision: response.tool_calls && response.tool_calls.length > 0,
+                  is_key_decision: response.toolCalls && response.toolCalls.length > 0,
                   thought_type: 'discussion_contribution'
                 }
               }
@@ -100,11 +100,11 @@ export const interactionTools: ToolDefinition[] = [
           
           // Handle any tool calls made by the agent
           let finalContent = response.content
-          if (response.tool_calls && response.tool_calls.length > 0) {
+          if (response.toolCalls && response.toolCalls.length > 0) {
             const toolResults = []
             const { context } = getAgentContext()
             
-            for (const toolCall of response.tool_calls) {
+            for (const toolCall of response.toolCalls) {
               try {
                 let result: any
                 
@@ -141,8 +141,8 @@ export const interactionTools: ToolDefinition[] = [
                 ...messages,
                 {
                   role: 'assistant',
-                  content: response.content,
-                  tool_calls: response.tool_calls
+                  content: response.content || null,
+                  toolCalls: response.toolCalls
                 },
                 {
                   role: 'tool',
@@ -162,7 +162,7 @@ export const interactionTools: ToolDefinition[] = [
           
           const contribution = {
             agent: agent.name || agent.id,
-            content: finalContent,
+            content: finalContent || null,
             round: round + 1,
             timestamp: new Date().toISOString()
           }
@@ -263,11 +263,11 @@ export const interactionTools: ToolDefinition[] = [
         
         // Handle any tool calls made by the agent
         let finalContent = response.content
-        if (response.tool_calls && response.tool_calls.length > 0) {
+        if (response.toolCalls && response.toolCalls.length > 0) {
           const toolResults = []
           const { context } = getAgentContext()
           
-          for (const toolCall of response.tool_calls) {
+          for (const toolCall of response.toolCalls) {
             try {
               let result: any
               
@@ -304,8 +304,8 @@ export const interactionTools: ToolDefinition[] = [
               { role: 'system', content: systemPrompt },
               {
                 role: 'assistant',
-                content: response.content,
-                tool_calls: response.tool_calls
+                content: response.content || null,
+                toolCalls: response.toolCalls
               },
               {
                 role: 'tool',

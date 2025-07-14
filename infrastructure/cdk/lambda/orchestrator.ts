@@ -407,6 +407,92 @@ async function handleError(supabase: any, sessionId: string, error: any) {
 }
 
 
+// Generate AI summary for tool execution
+async function generateToolSummary(toolCall: ToolCall, toolResult: any): Promise<string | undefined> {
+  try {
+    // Only generate summaries for successful executions with results
+    if (!toolResult.success || !toolResult.result) {
+      return undefined
+    }
+
+    const prompts: Record<string, string> = {
+      runDiscussion: `Summarize this multi-agent discussion in 2-3 sentences. Focus on the key insights and conclusions reached. Result: ${JSON.stringify(toolResult.result).slice(0, 1000)}`,
+      createAgent: `Describe this newly created agent in 1-2 sentences. Focus on their role and expertise. Agent: ${JSON.stringify(toolResult.result).slice(0, 500)}`,
+      analyzeResponses: `Summarize this analysis in 2-3 sentences. Highlight key findings and recommendations. Analysis: ${JSON.stringify(toolResult.result).slice(0, 1000)}`,
+      gatherResponses: `Summarize these gathered responses in 1-2 sentences. Focus on the diversity of perspectives. Responses: ${JSON.stringify(toolResult.result).slice(0, 1000)}`
+    }
+
+    const prompt = prompts[toolCall.name]
+    if (!prompt) return undefined
+
+    // Use Claude Haiku for quick summaries
+    const messages: LLMMessage[] = [{
+      role: 'user',
+      content: prompt
+    }]
+    
+    const response = await callLLMWithTools(
+      messages,
+      [],
+      'claude'
+    )
+
+    return response.content || undefined
+  } catch (error) {
+    console.error('Failed to generate tool summary:', error)
+    return undefined
+  }
+}
+
+// Generate phase summary for orchestration progress
+async function generatePhaseSummary(session: Session, supabase: any): Promise<void> {
+  try {
+    // Get recent events
+    const { data: events } = await supabase
+      .from('orchestration_events')
+      .select('*')
+      .eq('session_id', session.id)
+      .order('created_at', { ascending: false })
+      .limit(20)
+
+    if (!events || events.length === 0) return
+
+    // Analyze phase based on events
+    const hasAgents = events.some((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'createAgent')
+    const hasDiscussion = events.some((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'runDiscussion')
+    const hasAnalysis = events.some((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'analyzeResponses')
+    
+    let phaseType = 'initialization'
+    let phaseDescription = 'Setting up to address your request'
+    
+    if (hasAnalysis) {
+      phaseType = 'synthesis'
+      phaseDescription = 'Synthesizing findings and preparing recommendations'
+    } else if (hasDiscussion) {
+      phaseType = 'collaboration'
+      phaseDescription = 'Team members are discussing and sharing perspectives'
+    } else if (hasAgents) {
+      phaseType = 'team_building'
+      phaseDescription = 'Assembling the right experts for your challenge'
+    }
+
+    // Log phase summary event
+    await supabase.rpc('log_orchestration_event', {
+      p_session_id: session.id,
+      p_event_type: 'phase_summary',
+      p_event_data: {
+        phase: phaseType,
+        description: phaseDescription,
+        progress: Math.min(session.execution_count * 20, 90), // Rough progress estimate
+        agentCount: events.filter((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'createAgent').length,
+        toolsUsed: events.filter((e: any) => e.event_type === 'tool_call').length
+      }
+    })
+  } catch (error) {
+    console.error('Failed to generate phase summary:', error)
+  }
+}
+
 // Execute tool with timeout handling and verification
 async function executeToolWithTimeout(
   toolCall: ToolCall, 
@@ -432,7 +518,7 @@ async function executeToolWithTimeout(
         result = await mcpProxy.executeTool(context.userId, originalToolName, toolCall.arguments)
       } else {
         // Create tool execution context for regular tools
-        const toolContext: ToolExecutionContext = {
+        const toolContext: any = {
           supabase: context.supabase,
           userId: context.userId,
           sessionId: context.sessionId
@@ -539,6 +625,11 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
         execution_count: session.execution_count + 1
       })
       
+      // Generate phase summary periodically
+      if (session.execution_count % 3 === 0 && session.execution_count > 0) {
+        await generatePhaseSummary(session, supabase)
+      }
+      
       // Log status update event
       await supabase.rpc('log_orchestration_event', {
         p_session_id: session.id,
@@ -603,7 +694,7 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
         console.log(`Available tools: ${Object.keys(baseTools).length} base, ${Object.keys(mcpToolsFormatted).length} MCP`)
         
         // Set agent context so all agents have access to tools
-        setAgentContext(context, tools)
+        setAgentContext(context as any, tools)
         
         // Check if we need to handle message compaction
         const needsCompression = session.tool_state?.needs_compression || false
@@ -729,13 +820,20 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
               }
             }
             
-            // Log tool result event
+            // Generate AI summary for specific tools
+            let summary: string | undefined
+            if (['runDiscussion', 'createAgent', 'analyzeResponses', 'gatherResponses'].includes(toolCall.name)) {
+              summary = await generateToolSummary(toolCall, resultData)
+            }
+            
+            // Log tool result event with summary
             await supabase.rpc('log_orchestration_event', {
               p_session_id: session.id,
               p_event_type: 'tool_result',
               p_event_data: {
                 tool: toolCall.name,
                 tool_call_id: toolCall.id,
+                summary,
                 success: toolSucceeded,
                 result: toolSucceeded ? resultData.result : undefined,
                 error: !toolSucceeded ? (resultData.error || 'Tool execution failed') : undefined,
