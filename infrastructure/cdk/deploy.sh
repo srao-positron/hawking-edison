@@ -1,14 +1,16 @@
 #!/bin/bash
 # Deploy CDK stack with environment variables loaded
 
-# Load environment variables from .env.local
+# Load environment variables from .env.local if it exists
 if [ -f "../../.env.local" ]; then
   echo "Loading environment variables from .env.local..."
   export $(cat ../../.env.local | grep -v '^#' | xargs)
+else
+  echo "No .env.local found, using environment variables"
 fi
 
 # Map environment variables to expected names
-export SUPABASE_URL="${NEXT_PUBLIC_SUPABASE_URL}"
+export SUPABASE_URL="${SUPABASE_URL:-${NEXT_PUBLIC_SUPABASE_URL}}"
 
 # Verify required environment variables
 if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_SERVICE_ROLE_KEY" ] || [ -z "$VAULT_STORE_SERVICE_KEY" ]; then

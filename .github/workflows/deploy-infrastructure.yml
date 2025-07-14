@@ -42,14 +42,22 @@ jobs:
 
       - name: Deploy CDK stack
         working-directory: infrastructure/cdk
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VAULT_STORE_SERVICE_KEY: ${{ secrets.VAULT_STORE_SERVICE_KEY }}
         run: |
+          # Make deploy script executable
+          chmod +x ./deploy.sh
+          
           # Bootstrap CDK if needed
-          cdk bootstrap || true
+          npx cdk bootstrap || true
           
-          # Deploy stack
-          cdk deploy --require-approval never --outputs-file outputs.json
+          # Deploy stack using deploy script to ensure proper env vars
+          ./deploy.sh
           
-          # Extract outputs
+          # Extract outputs from CDK
+          npx cdk outputs --outputs-file outputs.json
           cat outputs.json
 
       - name: Display CDK outputs
