@@ -77,7 +77,10 @@ export class HawkingEdisonStack extends cdk.Stack {
         minify: false,
         sourceMap: true,
         target: 'es2022',
-        externalModules: [],
+        externalModules: [
+          '@aws-sdk/*',  // AWS SDK v3 is available in Lambda runtime
+          '@supabase/supabase-js', // This will be bundled separately
+        ],
       },
     })
 
@@ -198,7 +201,10 @@ export class HawkingEdisonStack extends cdk.Stack {
         minify: false,
         sourceMap: true,
         target: 'es2022',
-        externalModules: [],
+        externalModules: [
+          '@aws-sdk/*',  // AWS SDK v3 is available in Lambda runtime
+          '@supabase/supabase-js', // This will be bundled separately
+        ],
       },
     })
 
