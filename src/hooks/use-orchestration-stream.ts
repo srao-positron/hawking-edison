@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useAuth } from '@/contexts/auth-context'
+import { useAuth } from '@/hooks/useAuth'
 
 export interface OrchestrationEvent {
   type: string
@@ -28,7 +28,7 @@ export function useOrchestrationStream(
   sessionId: string | null,
   options: UseOrchestrationStreamOptions = {}
 ) {
-  const { session } = useAuth()
+  const { user } = useAuth()
   const [state, setState] = useState<OrchestrationState>({
     sessionId: sessionId || '',
     status: 'pending',
@@ -39,11 +39,11 @@ export function useOrchestrationStream(
   })
   
   const eventSourceRef = useRef<EventSource | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout>()
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttemptsRef = useRef(0)
 
   const connect = useCallback(() => {
-    if (!sessionId || !session?.access_token) return
+    if (!sessionId || !user) return
 
     // Clean up existing connection
     if (eventSourceRef.current) {
@@ -197,7 +197,7 @@ export function useOrchestrationStream(
         eventSource.close()
       })
 
-      eventSource.addEventListener('error', (event) => {
+      eventSource.addEventListener('error', (event: MessageEvent) => {
         const data = JSON.parse(event.data)
         setState(prev => ({
           ...prev,
@@ -223,7 +223,7 @@ export function useOrchestrationStream(
         isConnected: false 
       }))
     }
-  }, [sessionId, session?.access_token, options])
+  }, [sessionId, user, options])
 
   // Connect when sessionId changes
   useEffect(() => {

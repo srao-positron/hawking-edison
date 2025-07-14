@@ -115,7 +115,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         })
         
         console.log('[ChatInterface] Setting messages with orchestration IDs:', 
-          mappedMessages.filter(m => m.orchestrationSessionId).map(m => ({
+          mappedMessages.filter((m: Message) => m.orchestrationSessionId).map((m: Message) => ({
             id: m.id,
             role: m.role,
             orchestrationSessionId: m.orchestrationSessionId
@@ -259,6 +259,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
   const handleOrchestrationUpdate = async (payload: any) => {
     const session = payload.new as any
     const sessionId = session.id
+    const supabase = getBrowserClient()
     
     console.log('[ChatInterface] Orchestration update received:', {
       sessionId,
@@ -268,7 +269,6 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
     
     if (session.status === 'completed') {
       // Fetch the complete session data
-      const supabase = getBrowserClient()
       try {
         const { data: completeSession, error } = await supabase
           .from('orchestration_sessions')
