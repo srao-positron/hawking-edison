@@ -1,19 +1,26 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
-import ChatInterface from '@/components/ChatInterface'
+import { useEffect, Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
+import TabManager from '@/components/TabManager'
 import { useAuth } from '@/hooks/useAuth'
 import { useRouter, useSearchParams, useParams } from 'next/navigation'
-import { api } from '@/lib/api-client'
+import { useChatStore } from '@/stores/chat-store'
 
 function ChatPageContent() {
   const { user, loading } = useAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
   const params = useParams()
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
-  const [refreshThreads, setRefreshThreads] = useState(0)
+  
+  // Get all state from chat store
+  const { 
+    selectedThreadId, 
+    selectThread,
+    createNewChat,
+    refreshThreadList,
+    loadThreads
+  } = useChatStore()
 
   // Initialize session from URL (path param takes precedence)
   useEffect(() => {
@@ -21,10 +28,17 @@ function ChatPageContent() {
     const threadIdFromQuery = searchParams.get('thread')
     const threadId = threadIdFromPath || threadIdFromQuery
     
-    if (threadId) {
-      setCurrentSessionId(threadId)
+    if (threadId && threadId !== selectedThreadId) {
+      selectThread(threadId)
     }
-  }, [params.threadId, searchParams])
+  }, [params.threadId, searchParams, selectedThreadId, selectThread])
+
+  // Load threads on mount
+  useEffect(() => {
+    if (user) {
+      loadThreads()
+    }
+  }, [user, loadThreads])
 
   useEffect(() => {
     if (!loading && !user) {
@@ -32,32 +46,10 @@ function ChatPageContent() {
     }
   }, [user, loading, router])
 
-  const handleNewChat = () => {
-    // Clear current session to start fresh
-    setCurrentSessionId(null)
-    // Update URL without navigation
-    window.history.pushState({}, '', '/chat')
+  const handleThreadCreated = (threadId: string) => {
+    selectThread(threadId)
+    refreshThreadList()
   }
-
-  const handleSelectChat = async (threadId: string) => {
-    try {
-      // Update URL without causing a full navigation
-      window.history.pushState({}, '', `/chat/${threadId}`)
-      setCurrentSessionId(threadId)
-    } catch (error) {
-      console.error('Failed to load thread:', error)
-      // If thread not found, start new
-      handleNewChat()
-    }
-  }
-
-  const handleThreadCreated = useCallback((threadId: string) => {
-    // Update URL without causing a full navigation
-    window.history.pushState({}, '', `/chat/${threadId}`)
-    setCurrentSessionId(threadId)
-    // Trigger a single refresh of the thread list
-    setRefreshThreads(prev => prev + 1)
-  }, [])
 
   if (loading) {
     return (
@@ -76,17 +68,9 @@ function ChatPageContent() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar 
-        currentSessionId={currentSessionId} 
-        onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
-        refreshTrigger={refreshThreads}
-      />
+      <Sidebar />
       <div className="flex-1">
-        <ChatInterface 
-          sessionId={currentSessionId} 
-          onThreadCreated={handleThreadCreated}
-        />
+        <TabManager onThreadCreated={handleThreadCreated} />
       </div>
     </div>
   )

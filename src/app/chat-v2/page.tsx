@@ -8,11 +8,13 @@ import TwoPanelLayout from '@/components/TwoPanelLayout'
 import ThreadConversation from '@/components/ThreadConversation'
 import ArtifactRenderer from '@/components/ArtifactRenderer'
 import Sidebar from '@/components/Sidebar'
+import { useChatStore } from '@/stores/chat-store'
 
 export default function ChatV2Page() {
   const { user, loading } = useAuth()
   const router = useRouter()
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
+  // Get state from chat store
+  const { selectedThreadId: currentThreadId, loadThreads } = useChatStore()
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null)
   const [toolOutputs, setToolOutputs] = useState<any[]>([])
   const [thoughts, setThoughts] = useState<string[]>([])
@@ -24,16 +26,23 @@ export default function ChatV2Page() {
   }, [user, loading, router])
 
   useEffect(() => {
-    // Create initial thread on mount
+    // Load threads on mount
+    if (user) {
+      loadThreads()
+    }
+  }, [user, loadThreads])
+
+  useEffect(() => {
+    // Create initial thread on mount if none selected
     if (user && !currentThreadId) {
       createNewThread()
     }
-  }, [user])
+  }, [user, currentThreadId])
 
   const createNewThread = async () => {
     try {
       const { thread } = await api.threads.create('New Chat')
-      setCurrentThreadId(thread.id)
+      // The thread will be selected via realtime update
       setCurrentSessionId(null)
       setToolOutputs([])
       setThoughts([])
@@ -46,16 +55,7 @@ export default function ChatV2Page() {
     createNewThread()
   }
 
-  const handleSelectChat = async (threadId: string) => {
-    try {
-      setCurrentThreadId(threadId)
-      setCurrentSessionId(null)
-      setToolOutputs([])
-      setThoughts([])
-    } catch (error) {
-      console.error('Failed to load thread:', error)
-    }
-  }
+  // Thread selection is now handled by the Sidebar directly
 
   const handleToolExecution = (tool: string, params: any, result: any) => {
     if (result) {
@@ -84,11 +84,7 @@ export default function ChatV2Page() {
 
   return (
     <div className="flex h-screen">
-      <Sidebar 
-        currentSessionId={currentThreadId} 
-        onNewChat={handleNewChat}
-        onSelectChat={handleSelectChat}
-      />
+      <Sidebar />
       <div className="flex-1">
         <TwoPanelLayout
           rightPanel={

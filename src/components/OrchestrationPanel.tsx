@@ -1,241 +1,110 @@
 'use client'
 
-import { useEffect, useState, useRef } from 'react'
-import { ChevronRight, ChevronDown, Loader2, CheckCircle, XCircle, AlertCircle, Brain, MessageSquare, Wrench, Users, ArrowUpDown } from 'lucide-react'
-import { getBrowserClient } from '@/lib/supabase-browser'
+import { useEffect } from 'react'
+import { ChevronRight, ChevronDown, Loader2, CheckCircle, XCircle, AlertCircle, Brain, MessageSquare, Wrench, Users, ArrowUpDown, Clock, Zap, GitBranch, Sparkles, Eye, Activity, User, X } from 'lucide-react'
 import { formatDistanceToNow } from 'date-fns'
 import ToolCard from './orchestration/ToolCard'
-
-interface OrchestrationEvent {
-  id: string
-  session_id: string
-  event_type: string
-  event_data: any
-  created_at: string
-}
-
-interface Agent {
-  id: string
-  name: string
-  specification: string
-  thoughts: Array<{
-    thought: string
-    is_key_decision: boolean
-    thought_type: string
-    timestamp: string
-  }>
-}
-
-interface Discussion {
-  topic: string
-  style: string
-  turns: Array<{
-    agent_id: string
-    agent_name: string
-    message: string
-    round: number
-    timestamp: string
-  }>
-}
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { formatDuration } from '@/utils/format-duration'
+import { useOrchestrationStore, type OrchestrationEvent } from '@/stores/orchestration-store'
 
 interface OrchestrationPanelProps {
   sessionId: string | null
   isVisible: boolean
-  onClose: () => void
+  onClose?: () => void
+  fullScreen?: boolean
+  onOpenToolDetails?: (toolCall: any, toolResult: any) => void
 }
 
-interface SessionInfo {
-  status: string
-  error?: string
-  final_response?: string
-  created_at: string
-  completed_at?: string
-}
-
-export default function OrchestrationPanel({ sessionId, isVisible, onClose }: OrchestrationPanelProps) {
-  const [status, setStatus] = useState<string>('pending')
-  const [sessionInfo, setSessionInfo] = useState<SessionInfo | null>(null)
-  const [events, setEvents] = useState<OrchestrationEvent[]>([])
-  const [agents, setAgents] = useState<Map<string, Agent>>(new Map())
-  const [discussions, setDiscussions] = useState<Discussion[]>([])
-  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['timeline']))
-  const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set())
-  const [toolCount, setToolCount] = useState(0)
-  const [timelineSort, setTimelineSort] = useState<'newest' | 'oldest'>('newest')
-  const channelRef = useRef<any>(null)
+export default function OrchestrationPanel({ 
+  sessionId, 
+  isVisible, 
+  onClose, 
+  fullScreen = false,
+  onOpenToolDetails 
+}: OrchestrationPanelProps) {
+  // Zustand store
+  const { 
+    loadSession, 
+    getSessionData,
+    getUIState,
+    setActiveSession,
+    toggleSection,
+    toggleAgent,
+    setTimelineSort,
+    loadingStates,
+    subscribeToSession,
+    unsubscribeFromSession
+  } = useOrchestrationStore()
+  
+  // Get loading state
+  const isLoading = sessionId ? loadingStates.get(sessionId) || false : false
+  
+  // Get session data and UI state
+  const sessionData = sessionId ? getSessionData(sessionId) : null
+  const uiState = sessionId ? getUIState(sessionId) : null
+  
+  
+  const { 
+    info: sessionInfo, 
+    events = [], 
+    agents = [], 
+    discussions = [], 
+    toolCalls = [], 
+    toolResults = new Map(),
+    artifacts = []
+  } = sessionData || {}
+  
+  const {
+    expandedSections = new Set(['status', 'timeline']),
+    expandedAgents = new Set(),
+    timelineSort = 'newest'
+  } = uiState || {}
+  
+  const status = sessionInfo?.status || 'pending'
+  const toolCount = toolCalls.length
 
   useEffect(() => {
-    if (!sessionId || !isVisible) return
+    if (!sessionId) return
 
-    const supabase = getBrowserClient()
-    
-    // Load session info
-    const loadSessionInfo = async () => {
-      const { data: session, error: sessionError } = await supabase
-        .from('orchestration_sessions')
-        .select('*')
-        .eq('id', sessionId)
-        .single()
-      
-      if (sessionError) {
-        console.error('Failed to load session info:', sessionError)
-        return
-      }
-      
-      if (session) {
-        setSessionInfo({
-          status: session.status,
-          error: session.error,
-          final_response: session.final_response,
-          created_at: session.created_at,
-          completed_at: session.completed_at
-        })
-        setStatus(session.status)
-      }
+    // Only load session if we don't already have data for it
+    const existingData = getSessionData(sessionId)
+    if (!existingData.info && isVisible) {
+      setActiveSession(sessionId)
+      loadSession(sessionId)
     }
     
-    // Load existing events
-    const loadEvents = async () => {
-      const { data, error } = await supabase
-        .from('orchestration_events')
-        .select('*')
-        .eq('session_id', sessionId)
-        .order('created_at', { ascending: true })
-
-      if (error) {
-        console.error('Failed to load orchestration events:', error)
-        return
-      }
-
-      if (data) {
-        setEvents(data)
-        processEvents(data)
-      }
+    // Always subscribe to realtime updates when visible
+    if (isVisible) {
+      subscribeToSession(sessionId)
     }
-
-    loadSessionInfo()
-    loadEvents()
-
-    // Subscribe to new events
-    const channel = supabase
-      .channel(`orchestration:${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'orchestration_events',
-          filter: `session_id=eq.${sessionId}`
-        },
-        (payload) => {
-          const newEvent = payload.new as OrchestrationEvent
-          setEvents(prev => {
-            const updated = [...prev, newEvent]
-            processEvents(updated)
-            return updated
-          })
-        }
-      )
-      .subscribe()
-
-    channelRef.current = channel
-
+    
+    // Cleanup on unmount - just unsubscribe, don't clear data
     return () => {
-      channel.unsubscribe()
+      if (!isVisible) {
+        unsubscribeFromSession(sessionId)
+      }
     }
-  }, [sessionId, isVisible])
+  }, [sessionId, isVisible, setActiveSession, loadSession, getSessionData, subscribeToSession, unsubscribeFromSession])
 
-  const processEvents = (eventList: OrchestrationEvent[]) => {
-    let currentStatus = 'pending'
-    let tools = 0
-    const agentMap = new Map<string, Agent>()
-    const discussionMap = new Map<string, Discussion>()
-
-    eventList.forEach(event => {
-      const data = event.event_data
-
-      switch (event.event_type) {
-        case 'status_update':
-          currentStatus = data.status || data.to || currentStatus
-          break
-
-        case 'tool_call':
-          tools++
-          break
-
-        case 'agent_created':
-          agentMap.set(data.agent_id, {
-            id: data.agent_id,
-            name: data.name,
-            specification: data.specification,
-            thoughts: []
-          })
-          break
-
-        case 'agent_thought':
-          const agent = agentMap.get(data.agent_id)
-          if (agent) {
-            agent.thoughts.push({
-              thought: data.thought,
-              is_key_decision: data.is_key_decision || false,
-              thought_type: data.thought_type || 'general',
-              timestamp: event.created_at
-            })
-          }
-          break
-
-        case 'discussion_turn':
-          const discussionKey = `${data.topic}-${data.style}`
-          let discussion = discussionMap.get(discussionKey)
-          
-          if (!discussion) {
-            discussion = {
-              topic: data.topic,
-              style: data.style,
-              turns: []
-            }
-            discussionMap.set(discussionKey, discussion)
-          }
-          
-          discussion.turns.push({
-            agent_id: data.agent_id,
-            agent_name: data.agent_name,
-            message: data.message,
-            round: data.round,
-            timestamp: event.created_at
-          })
-          break
-      }
-    })
-
-    setStatus(currentStatus)
-    setToolCount(tools)
-    setAgents(agentMap)
-    setDiscussions(Array.from(discussionMap.values()))
+  // UI event handlers using store actions
+  const handleToggleSection = (section: string) => {
+    if (sessionId) {
+      toggleSection(sessionId, section)
+    }
   }
 
-  const toggleSection = (section: string) => {
-    setExpandedSections(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(section)) {
-        newSet.delete(section)
-      } else {
-        newSet.add(section)
-      }
-      return newSet
-    })
+  const handleToggleAgent = (agentId: string) => {
+    if (sessionId) {
+      toggleAgent(sessionId, agentId)
+    }
   }
 
-  const toggleAgent = (agentId: string) => {
-    setExpandedAgents(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(agentId)) {
-        newSet.delete(agentId)
-      } else {
-        newSet.add(agentId)
-      }
-      return newSet
-    })
+  const handleSetTimelineSort = (sort: 'newest' | 'oldest') => {
+    if (sessionId) {
+      setTimelineSort(sessionId, sort)
+    }
   }
 
   const getStatusIcon = () => {
@@ -243,7 +112,6 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
       case 'pending':
         return <AlertCircle className="w-5 h-5 text-yellow-500" />
       case 'running':
-      case 'processing':
         return <Loader2 className="w-5 h-5 text-blue-500 animate-spin" />
       case 'completed':
         return <CheckCircle className="w-5 h-5 text-green-500" />
@@ -259,7 +127,6 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
       case 'pending':
         return 'Pending'
       case 'running':
-      case 'processing':
         return 'Running'
       case 'completed':
         return 'Completed'
@@ -274,353 +141,563 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
     const data = event.event_data
     switch (event.event_type) {
       case 'status_update':
-        return `Status: ${data.to || data.status || 'Updated'}`
-      case 'tool_call':
-        // Try to get friendly name from metadata
-        const toolName = data.tool || 'tool'
-        if (toolName.startsWith('mcp_')) {
-          const parts = toolName.replace('mcp_', '').split('_')
-          const service = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
-          return `${service} API Called`
+        const statusColors: { [key: string]: string } = {
+          'running': 'text-blue-600',
+          'completed': 'text-green-600',
+          'failed': 'text-red-600',
+          'pending': 'text-yellow-600'
         }
-        return `${toolName.replace(/([A-Z])/g, ' $1').trim()} Called`
+        const statusValue = data.to || data.status || 'Updated'
+        return (
+          <span className={`flex items-center gap-2 ${statusColors[statusValue] || 'text-gray-600'}`}>
+            <Activity className="w-4 h-4" />
+            Status: {statusValue}
+          </span>
+        )
+      case 'tool_call':
+        const toolName = data.tool || 'tool'
+        let displayName = toolName.startsWith('mcp_') 
+          ? toolName.replace('mcp_', '').split('_').map((w: string) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')
+          : toolName.replace(/([A-Z])/g, ' $1').trim()
+        
+        // Add specific details for certain tools
+        if (data.tool === 'createAgent' && data.arguments?.specification) {
+          // Extract agent name from specification
+          const nameMatch = data.arguments.specification.match(/(?:named?|called?)\s+["`']?([^"`']+)["`']?/i) ||
+                           data.arguments.specification.match(/^([^,.!]+)(?:[,.!]|$)/)
+          if (nameMatch) {
+            displayName = `Create Agent: ${nameMatch[1].trim()}`
+          }
+        } else if (data.tool === 'runDiscussion' && data.arguments?.topic) {
+          const topic = data.arguments.topic
+          if (topic.length > 40) {
+            displayName = `Run Discussion: ${topic.substring(0, 40)}...`
+          } else {
+            displayName = `Run Discussion: ${topic}`
+          }
+        }
+        
+        // Show who is calling the tool
+        const actor = data.agent_id || data.agent_name 
+          ? data.agent_name || agents.find(a => a.id === data.agent_id)?.name || 'Agent'
+          : 'Orchestrator'
+          
+        return (
+          <div>
+            <span className="flex items-center gap-2 text-blue-600">
+              <Zap className="w-4 h-4" />
+              {displayName}
+            </span>
+            <span className="text-xs text-gray-500 ml-6">by {actor}</span>
+          </div>
+        )
       case 'tool_result':
         const resultToolName = data.tool || 'tool'
-        const status = data.success ? '✓' : '✗'
-        if (resultToolName.startsWith('mcp_')) {
-          const parts = resultToolName.replace('mcp_', '').split('_')
-          const service = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
-          return `${status} ${service} Response`
-        }
-        return `${status} ${resultToolName.replace(/([A-Z])/g, ' $1').trim()}`
-      case 'agent_created':
-        return `🤖 Created: ${data.name || 'Agent'}`
+        const resultFriendlyName = resultToolName.startsWith('mcp_')
+          ? resultToolName.replace('mcp_', '').split('_')[0].charAt(0).toUpperCase() + resultToolName.replace('mcp_', '').split('_')[0].slice(1)
+          : resultToolName.replace(/([A-Z])/g, ' $1').trim()
+        return data.success ? (
+          <span className="flex items-center gap-2 text-green-600">
+            <CheckCircle className="w-4 h-4" />
+            {resultFriendlyName} Success
+          </span>
+        ) : (
+          <span className="flex items-center gap-2 text-red-600">
+            <AlertCircle className="w-4 h-4" />
+            {resultFriendlyName} Failed
+          </span>
+        )
+      case 'thinking':
       case 'agent_thought':
-        return `💭 ${data.agent_name || 'Agent'} thinking`
-      case 'discussion_turn':
-        return `💬 ${data.agent_name || 'Agent'}: "${data.message?.substring(0, 50)}..."`
+        // Check if this is an agent thinking
+        if (data.agent_id || data.agent_name || data.step === 'agent_discussion') {
+          const agentName = data.agent_name || 
+                           agents.find(a => a.id === data.agent_id)?.name || 
+                           'Unknown Agent'
+          return (
+            <span className="flex items-center gap-2 text-purple-600">
+              <Brain className="w-4 h-4" />
+              <span className="font-medium">{agentName}</span> thinking
+            </span>
+          )
+        }
+        return (
+          <span className="flex items-center gap-2 text-purple-600">
+            <Brain className="w-4 h-4" />
+            Orchestrator thinking
+          </span>
+        )
       case 'message':
-        return '📨 Message sent'
+        return (
+          <span className="flex items-center gap-2 text-gray-600">
+            <MessageSquare className="w-4 h-4" />
+            Message sent
+          </span>
+        )
+      case 'discussion_turn':
+        return (
+          <span className="flex items-center gap-2 text-indigo-600">
+            <Users className="w-4 h-4" />
+            <span className="font-medium">{data.agent_name || 'Agent'}</span> in discussion
+          </span>
+        )
       case 'error':
-        return `⚠️ Error: ${data.error?.substring(0, 50)}...`
+        return (
+          <span className="flex items-center gap-2 text-red-600">
+            <XCircle className="w-4 h-4" />
+            Error: {data.error?.substring(0, 50)}...
+          </span>
+        )
       default:
-        return event.event_type.replace(/_/g, ' ')
+        return (
+          <span className="text-gray-600">
+            {event.event_type.replace(/_/g, ' ')}
+          </span>
+        )
     }
   }
 
   if (!isVisible) return null
 
-  return (
-    <div className="fixed right-0 top-0 h-screen w-[480px] bg-white shadow-xl z-40 flex flex-col">
-      {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 border-b">
-        <h2 className="text-xl font-semibold">Orchestration Details</h2>
-        <button
-          onClick={onClose}
-          className="text-gray-400 hover:text-gray-600 transition-colors"
-        >
-          <ChevronRight className="w-5 h-5" />
-        </button>
-      </div>
+  const containerClass = fullScreen 
+    ? "flex flex-col h-full bg-gray-50"
+    : "fixed bottom-4 right-4 w-96 max-h-[80vh] bg-white rounded-lg shadow-xl border overflow-hidden"
 
-      {/* Content */}
+  return (
+    <div className={containerClass}>
       <div className="flex-1 overflow-y-auto">
-        {/* Status Section */}
-        <div className="border-b">
-          <button
-            onClick={() => toggleSection('status')}
-            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {getStatusIcon()}
-              <span className="font-medium">Status</span>
+        {/* Header */}
+        {fullScreen ? (
+          <div className="mb-6">
+            <h1 className="text-3xl font-bold text-gray-900">Orchestration Details</h1>
+            <div className="mt-2 flex items-center gap-2 text-xs text-gray-400">
+              <Eye className="w-3 h-3" />
+              <span>Session: {sessionId?.slice(0, 8)}...</span>
             </div>
-            {expandedSections.has('status') ? 
-              <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            }
-          </button>
-          
-          {expandedSections.has('status') && (
-            <div className="px-6 pb-4 space-y-3">
-              <div className="flex items-center justify-between py-2">
-                <span className="text-gray-600">Current Status:</span>
-                <span className="font-medium">{getStatusText()}</span>
+          </div>
+        ) : (
+          <div className="sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between">
+            <h2 className="font-semibold text-gray-900">Orchestration Details</h2>
+            <button
+              onClick={onClose}
+              className="p-1 hover:bg-gray-100 rounded transition-colors"
+            >
+              <X className="w-4 h-4 text-gray-500" />
+            </button>
+          </div>
+        )}
+
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="flex items-center justify-center h-96">
+            <div className="text-center">
+              <Loader2 className="w-8 h-8 text-blue-600 animate-spin mx-auto mb-4" />
+              <p className="text-gray-600">Loading orchestration details...</p>
+            </div>
+          </div>
+        ) : fullScreen ? (
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+            {/* Left Column - Status and Timeline */}
+            <div className="xl:col-span-1 space-y-6">
+              {/* Status Card */}
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Activity className="w-5 h-5 text-gray-600" />
+                    Status
+                  </h3>
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      {getStatusIcon()}
+                      <span className="text-lg font-medium">{getStatusText()}</span>
+                    </div>
+                    <div className="text-sm text-gray-600">
+                      <div>Tools Used: {toolCount}</div>
+                      <div>Agents Created: {agents.length}</div>
+                    </div>
+                    {sessionInfo?.error && (
+                      <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                        <div className="text-sm text-red-700">{sessionInfo.error}</div>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
-              
-              {status === 'failed' && sessionInfo?.error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                  <div className="font-medium text-red-800 mb-1">Error Details:</div>
-                  <div className="text-sm text-red-700">{sessionInfo.error}</div>
+
+              {/* Timeline Card - Redesigned */}
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold flex items-center gap-2 text-gray-700">
+                      <GitBranch className="w-4 h-4 text-indigo-500" />
+                      Event Flow
+                    </h3>
+                    <button
+                      onClick={() => handleSetTimelineSort(timelineSort === 'newest' ? 'oldest' : 'newest')}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                    >
+                      <ArrowUpDown className="w-3 h-3" />
+                      <span>{timelineSort === 'newest' ? 'Newest' : 'Oldest'}</span>
+                    </button>
+                  </div>
                   
-                  {events.some(e => e.event_type === 'tool_result' && e.event_data.success) && (
-                    <div className="mt-3 text-sm text-orange-700 bg-orange-50 p-2 rounded">
-                      <strong>Note:</strong> Some operations may have completed successfully before the error occurred. 
-                      Check the timeline and tool results below for details.
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {events.length === 0 ? (
+                      <div className="text-gray-500 text-xs text-center py-4">No events yet</div>
+                    ) : (
+                      (timelineSort === 'newest' ? events.slice().reverse() : events.slice()).map((event, idx) => {
+                        // Find related tool result for tool calls
+                        const relatedResult = event.event_type === 'tool_call' 
+                          ? events.find(e => 
+                              e.event_type === 'tool_result' && 
+                              e.event_data?.tool_call_id === event.event_data?.tool_call_id
+                            )
+                          : null
+                        
+                        // Skip tool results that are shown as part of tool calls
+                        if (event.event_type === 'tool_result') {
+                          const hasRelatedCall = events.some(e => 
+                            e.event_type === 'tool_call' && 
+                            e.event_data?.tool_call_id === event.event_data?.tool_call_id
+                          )
+                          if (hasRelatedCall) return null
+                        }
+                        
+                        return (
+                          <div key={`timeline-event-${idx}-${event.id || 'no-id'}`} className="relative">
+                            <div className={`
+                              flex items-start gap-2 p-2 rounded-lg transition-all
+                              ${event.event_type === 'tool_call' ? 'bg-blue-50 border border-blue-200' : ''}
+                              ${event.event_type === 'thinking' ? 'bg-purple-50 border border-purple-200' : ''}
+                              ${event.event_type === 'status_update' ? 'bg-gray-50 border border-gray-200' : ''}
+                              ${!['tool_call', 'thinking', 'status_update'].includes(event.event_type) ? 'bg-gray-50' : ''}
+                              hover:shadow-sm
+                            `}>
+                              <div className="flex-1">
+                                <div className="text-xs font-medium">
+                                  {getEventDescription(event)}
+                                </div>
+                                {relatedResult && (
+                                  <div className="mt-1 ml-6 text-xs">
+                                    <span className="text-gray-400">→</span> {getEventDescription(relatedResult)}
+                                  </div>
+                                )}
+                                <div className="text-xs text-gray-400 mt-0.5">
+                                  {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }).filter(Boolean)
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Middle Column - Tools */}
+            <div className="xl:col-span-1">
+              <div className="bg-white rounded-lg shadow-sm border h-full">
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Wrench className="w-5 h-5 text-gray-600" />
+                    Tools ({toolCount})
+                  </h3>
+                  
+                  {toolCount === 0 ? (
+                    <div className="text-gray-500 text-sm">No tools have been called yet</div>
+                  ) : (
+                    <div className="space-y-3 max-h-[calc(100vh-16rem)] overflow-y-auto">
+                      {toolCalls.map((toolCall) => {
+                        const toolResult = toolResults.get(toolCall.tool_call_id)
+                        const isPending = !toolResult && (status === 'running' || status === 'pending')
+                        
+                        return (
+                          <ToolCard
+                            key={toolCall.tool_call_id}
+                            toolCall={toolCall}
+                            toolResult={toolResult}
+                            isPending={isPending}
+                            onLoadDetails={onOpenToolDetails}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Right Column - Agents & Discussions */}
+            <div className="xl:col-span-1 space-y-6">
+              {/* Agents Card */}
+              <div className="bg-white rounded-lg shadow-sm border">
+                <div className="p-6">
+                  <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                    <Brain className="w-5 h-5 text-gray-600" />
+                    Agents ({agents.length})
+                  </h3>
+                  
+                  <div className="space-y-3 max-h-96 overflow-y-auto">
+                    {agents.map((agent, index) => (
+                      <div key={`agent-${agent.id}-${index}`} className="border rounded-lg p-3">
+                        <button
+                          onClick={() => handleToggleAgent(agent.id)}
+                          className="w-full flex items-center justify-between text-left"
+                        >
+                          <div>
+                            <div className="font-medium text-sm">{agent.name}</div>
+                            <div className="text-xs text-gray-500">{agent.specification}</div>
+                          </div>
+                          {expandedAgents.has(agent.id) ? 
+                            <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+                            <ChevronRight className="w-4 h-4 text-gray-400" />
+                          }
+                        </button>
+                        
+                        {expandedAgents.has(agent.id) && (
+                          <div className="mt-3 space-y-2">
+                            {agent.thoughts.length === 0 ? (
+                              <div className="text-xs text-gray-400 italic p-2">
+                                No thoughts recorded yet
+                              </div>
+                            ) : (
+                              <>
+                                <div className="text-xs font-medium text-gray-700">Thoughts & Analysis:</div>
+                                {agent.thoughts.map((thought, idx) => (
+                                  <div 
+                                    key={idx}
+                                    className={`text-xs p-2 rounded ${
+                                      thought.is_key_decision 
+                                        ? 'bg-blue-50 border-l-2 border-blue-400' 
+                                        : 'bg-gray-50'
+                                    }`}
+                                  >
+                                    <div className="prose prose-xs max-w-none">
+                                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                        {thought.thought}
+                                      </ReactMarkdown>
+                                    </div>
+                                    <div className="text-xs text-gray-500 mt-1 flex items-center justify-between">
+                                      <span>{formatDistanceToNow(new Date(thought.timestamp), { addSuffix: true })}</span>
+                                      {thought.is_key_decision && (
+                                        <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                                          Key Decision
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Discussions Card */}
+              {discussions.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Users className="w-5 h-5 text-gray-600" />
+                      Discussions ({discussions.length})
+                    </h3>
+                    
+                    <div className="space-y-3 max-h-96 overflow-y-auto">
+                      {discussions.map((discussion, idx) => (
+                        <div key={idx} className="border rounded-lg p-3">
+                          <div className="font-medium text-sm mb-2">
+                            {discussion.topic}
+                            <span className="text-xs text-gray-500 ml-2">({discussion.style})</span>
+                          </div>
+                          <div className="text-xs text-gray-500 mb-2">
+                            {discussion.turns.length} exchange{discussion.turns.length !== 1 ? 's' : ''}
+                          </div>
+                          <div className="space-y-2 max-h-60 overflow-y-auto">
+                            {discussion.turns.map((turn, turnIdx) => (
+                              <div key={turnIdx} className="bg-gray-50 rounded p-2">
+                                <div className="font-medium text-xs text-gray-700 mb-1">
+                                  {turn.agent_name} (Round {turn.round}):
+                                </div>
+                                <div className="prose prose-xs max-w-none text-gray-600">
+                                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                                    {turn.message}
+                                  </ReactMarkdown>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Artifacts Card */}
+              {artifacts.length > 0 && (
+                <div className="bg-white rounded-lg shadow-sm border">
+                  <div className="p-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Sparkles className="w-5 h-5 text-gray-600" />
+                      Artifacts ({artifacts.length})
+                    </h3>
+                    
+                    <div className="space-y-2">
+                      {artifacts.map((artifact) => (
+                        <div 
+                          key={artifact.id} 
+                          className="flex items-center justify-between p-2 bg-gray-50 rounded hover:bg-gray-100 transition-colors cursor-pointer"
+                          onClick={() => {
+                            // TODO: Open artifact in new tab
+                            console.log('Open artifact:', artifact)
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs font-medium text-gray-700">{artifact.title}</span>
+                            <span className="text-xs text-gray-500">({artifact.type})</span>
+                          </div>
+                          <Eye className="w-3 h-3 text-gray-400" />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        ) : (
+          // Compact view for sidebar mode
+          <>
+            {/* Status Section */}
+            <div>
+              <button
+                onClick={() => handleToggleSection('status')}
+                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-medium">Status</span>
+                {expandedSections.has('status') ? 
+                  <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                }
+              </button>
+              
+              {expandedSections.has('status') && (
+                <div className="px-6 pb-4">
+                  <div className="flex items-center gap-3">
+                    {getStatusIcon()}
+                    <span className="text-lg font-medium">{getStatusText()}</span>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-600">
+                    <div>Tools Used: {toolCount}</div>
+                    <div>Agents Created: {agents.length}</div>
+                  </div>
+                  {sessionInfo?.error && (
+                    <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded">
+                      <div className="text-sm text-red-700">{sessionInfo.error}</div>
                     </div>
                   )}
                 </div>
               )}
+            </div>
+
+            {/* Tools Section */}
+            <div>
+              <button
+                onClick={() => handleToggleSection('tools')}
+                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <span className="font-medium">Tools ({toolCount})</span>
+                {expandedSections.has('tools') ? 
+                  <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                }
+              </button>
               
-              {sessionInfo?.final_response && (
-                <div className="text-sm text-gray-600">
-                  <div className="font-medium mb-1">Final Response:</div>
-                  <div className="bg-gray-50 p-2 rounded">
-                    {(() => {
-                      try {
-                        const parsed = JSON.parse(sessionInfo.final_response)
-                        return parsed.content || sessionInfo.final_response
-                      } catch {
-                        return sessionInfo.final_response
-                      }
-                    })()}
-                  </div>
+              {expandedSections.has('tools') && (
+                <div className="px-6 pb-4">
+                  {toolCount === 0 ? (
+                    <div className="text-gray-500 text-sm">No tools have been called yet</div>
+                  ) : (
+                    <div className="space-y-3 max-h-60 overflow-y-auto">
+                      {toolCalls.map((toolCall) => {
+                        const toolResult = toolResults.get(toolCall.tool_call_id)
+                        const isPending = !toolResult && (status === 'running' || status === 'pending')
+                        
+                        return (
+                          <ToolCard
+                            key={toolCall.tool_call_id}
+                            toolCall={toolCall}
+                            toolResult={toolResult}
+                            isPending={isPending}
+                            onLoadDetails={onOpenToolDetails}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
-          )}
-        </div>
 
-        {/* Tools Section */}
-        <div className="border-b">
-          <button
-            onClick={() => toggleSection('tools')}
-            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <Wrench className="w-5 h-5 text-gray-600" />
-              <span className="font-medium">Tools ({toolCount})</span>
-            </div>
-            {expandedSections.has('tools') ? 
-              <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            }
-          </button>
-          
-          {expandedSections.has('tools') && (
-            <div className="px-6 pb-4">
-              {toolCount === 0 ? (
-                <div className="text-gray-500 text-sm">
-                  No tools have been called yet
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {events
-                    .filter(e => e.event_type === 'tool_call')
-                    .map((event) => {
-                      const toolResult = events.find(
-                        e => e.event_type === 'tool_result' && 
-                        e.event_data.tool_call_id === event.event_data.tool_call_id
-                      )
-                      
-                      // Check if tool is still running (no result yet and session is active)
-                      const isPending = !toolResult && (status === 'running' || status === 'pending')
-                      
-                      return (
-                        <ToolCard
-                          key={event.id}
-                          toolCall={event.event_data}
-                          toolResult={toolResult?.event_data}
-                          isPending={isPending}
-                        />
-                      )
-                    })}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Agents Section */}
-        {agents.size > 0 && (
-          <div className="border-b">
-            <button
-              onClick={() => toggleSection('agents')}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Brain className="w-5 h-5 text-gray-600" />
-                <span className="font-medium">Agents ({agents.size})</span>
-              </div>
-              {expandedSections.has('agents') ? 
-                <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              }
-            </button>
-            
-            {expandedSections.has('agents') && (
-              <div className="px-6 pb-4 space-y-3">
-                {Array.from(agents.values()).map(agent => (
-                  <div key={agent.id} className="border rounded-lg p-3">
+            {/* Timeline Section */}
+            <div>
+              <button
+                onClick={() => handleToggleSection('timeline')}
+                className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <span className="font-medium">Timeline ({events.length})</span>
+                  {expandedSections.has('timeline') && (
                     <button
-                      onClick={() => toggleAgent(agent.id)}
-                      className="w-full flex items-center justify-between text-left"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleSetTimelineSort(timelineSort === 'newest' ? 'oldest' : 'newest')
+                      }}
+                      className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                      title={`Sort by ${timelineSort === 'newest' ? 'oldest' : 'newest'} first`}
                     >
-                      <div>
-                        <div className="font-medium text-sm">{agent.name}</div>
-                        <div className="text-xs text-gray-500">{agent.specification}</div>
-                      </div>
-                      {expandedAgents.has(agent.id) ? 
-                        <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-                        <ChevronRight className="w-4 h-4 text-gray-400" />
-                      }
+                      <ArrowUpDown className="w-3 h-3" />
+                      <span>{timelineSort === 'newest' ? 'Newest' : 'Oldest'}</span>
                     </button>
-                    
-                    {expandedAgents.has(agent.id) && (
-                      <div className="mt-3 space-y-2">
-                        {agent.thoughts.length === 0 ? (
-                          <div className="text-xs text-gray-400 italic p-2">
-                            No thoughts recorded yet
+                  )}
+                </div>
+                {expandedSections.has('timeline') ? 
+                  <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+                  <ChevronRight className="w-4 h-4 text-gray-400" />
+                }
+              </button>
+              
+              {expandedSections.has('timeline') && (
+                <div className="px-6 pb-4">
+                  <div className="space-y-3 max-h-60 overflow-y-auto">
+                    {events.length === 0 ? (
+                      <div className="text-gray-500 text-sm">No events yet</div>
+                    ) : (
+                      (timelineSort === 'newest' ? events.slice().reverse() : events.slice()).map((event, idx) => (
+                        <div key={`sidebar-event-${event.id || idx}`} className="flex items-start gap-3">
+                          <div className="flex-1">
+                            <div className="text-sm font-medium text-gray-900">
+                              {getEventDescription(event)}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
+                            </div>
                           </div>
-                        ) : (
-                          <>
-                            <div className="text-xs font-medium text-gray-700">Thoughts & Analysis:</div>
-                            {agent.thoughts.map((thought, idx) => (
-                              <div 
-                                key={idx}
-                                className={`text-xs p-2 rounded ${
-                                  thought.is_key_decision 
-                                    ? 'bg-blue-50 border-l-2 border-blue-400' 
-                                    : thought.thought_type === 'discussion_contribution'
-                                    ? 'bg-green-50 border-l-2 border-green-400'
-                                    : 'bg-gray-50'
-                                }`}
-                              >
-                                <div className="whitespace-pre-wrap">
-                                  {thought.thought}
-                                </div>
-                                <div className="text-xs text-gray-500 mt-1 flex items-center justify-between">
-                                  <span>{formatDistanceToNow(new Date(thought.timestamp), { addSuffix: true })}</span>
-                                  {thought.is_key_decision && (
-                                    <span className="text-blue-600 font-medium">Key Decision</span>
-                                  )}
-                                  {thought.thought_type === 'discussion_contribution' && (
-                                    <span className="text-green-600 font-medium">Discussion</span>
-                                  )}
-                                </div>
-                              </div>
-                            ))}
-                          </>
-                        )}
-                      </div>
+                        </div>
+                      ))
                     )}
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Discussions Section */}
-        {discussions.length > 0 && (
-          <div className="border-b">
-            <button
-              onClick={() => toggleSection('discussions')}
-              className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-            >
-              <div className="flex items-center gap-3">
-                <Users className="w-5 h-5 text-gray-600" />
-                <span className="font-medium">Discussions ({discussions.length})</span>
-              </div>
-              {expandedSections.has('discussions') ? 
-                <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-                <ChevronRight className="w-4 h-4 text-gray-400" />
-              }
-            </button>
-            
-            {expandedSections.has('discussions') && (
-              <div className="px-6 pb-4 space-y-3">
-                {discussions.length === 0 ? (
-                  <div className="text-gray-500 text-sm">
-                    No agent discussions yet
-                  </div>
-                ) : (
-                  discussions.map((discussion, idx) => (
-                    <div key={idx} className="border rounded-lg p-3">
-                      <div className="font-medium text-sm mb-2">
-                        {discussion.topic}
-                        <span className="text-xs text-gray-500 ml-2">({discussion.style})</span>
-                      </div>
-                      <div className="text-xs text-gray-500 mb-2">
-                        {discussion.turns.length} exchange{discussion.turns.length !== 1 ? 's' : ''}
-                      </div>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {discussion.turns.length === 0 ? (
-                          <div className="text-gray-400 text-xs italic">
-                            Waiting for agent responses...
-                          </div>
-                        ) : (
-                          discussion.turns.map((turn, turnIdx) => (
-                            <div key={turnIdx} className="bg-gray-50 rounded p-2">
-                              <div className="font-medium text-xs text-gray-700 mb-1">
-                                {turn.agent_name} (Round {turn.round}):
-                              </div>
-                              <div className="text-xs text-gray-600 whitespace-pre-wrap">
-                                {turn.message}
-                              </div>
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Timeline Section */}
-        <div>
-          <button
-            onClick={() => toggleSection('timeline')}
-            className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              <span className="font-medium">Timeline ({events.length})</span>
-              {expandedSections.has('timeline') && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    setTimelineSort(timelineSort === 'newest' ? 'oldest' : 'newest')
-                  }}
-                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
-                  title={`Sort by ${timelineSort === 'newest' ? 'oldest' : 'newest'} first`}
-                >
-                  <ArrowUpDown className="w-3 h-3" />
-                  <span>{timelineSort === 'newest' ? 'Newest' : 'Oldest'}</span>
-                </button>
+                </div>
               )}
             </div>
-            {expandedSections.has('timeline') ? 
-              <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-              <ChevronRight className="w-4 h-4 text-gray-400" />
-            }
-          </button>
-          
-          {expandedSections.has('timeline') && (
-            <div className="px-6 pb-4">
-              <div className="space-y-3 max-h-60 overflow-y-auto">
-                {events.length === 0 ? (
-                  <div className="text-gray-500 text-sm">No events yet</div>
-                ) : (
-                  (timelineSort === 'newest' ? events.slice().reverse() : events.slice()).map((event) => (
-                    <div key={event.id} className="flex items-start gap-3">
-                      <div className="flex-1">
-                        <div className="text-sm font-medium text-gray-900">
-                          {getEventDescription(event)}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {formatDistanceToNow(new Date(event.created_at), { addSuffix: true })}
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   )

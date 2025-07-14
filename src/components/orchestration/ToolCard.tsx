@@ -1,5 +1,7 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, CheckCircle, XCircle, Loader2, Clock } from 'lucide-react'
+import { ChevronDown, ChevronRight, CheckCircle, XCircle, Loader2, Clock, ExternalLink, MessageSquare, Eye } from 'lucide-react'
+import JsonTreeViewer from './JsonTreeViewer'
+import { formatDuration } from '@/utils/format-duration'
 
 interface ToolCardProps {
   toolCall: {
@@ -15,9 +17,10 @@ interface ToolCardProps {
     duration_ms?: number
   }
   isPending: boolean
+  onLoadDetails?: (toolCall: any, toolResult: any) => void
 }
 
-export default function ToolCard({ toolCall, toolResult, isPending }: ToolCardProps) {
+export default function ToolCard({ toolCall, toolResult, isPending, onLoadDetails }: ToolCardProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   
   const getToolDisplayName = (toolName: string) => {
@@ -78,32 +81,51 @@ export default function ToolCard({ toolCall, toolResult, isPending }: ToolCardPr
   
   return (
     <div className="border rounded-lg">
-      <button
-        onClick={() => setIsExpanded(!isExpanded)}
-        className="w-full p-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          {getStatusIcon()}
-          <div className="text-left">
-            <div className="font-medium text-sm">{getToolDisplayName(toolCall.tool)}</div>
-            <div className="text-xs text-gray-500">{formatArguments(toolCall.arguments)}</div>
+      <div className="flex items-stretch">
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="flex-1 p-3 flex items-center justify-between hover:bg-gray-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            {getStatusIcon()}
+            <div className="text-left">
+              <div className="font-medium text-sm flex items-center gap-2">
+                {getToolDisplayName(toolCall.tool)}
+                {toolCall.tool === 'runDiscussion' && (
+                  <MessageSquare className="w-4 h-4 text-blue-500" />
+                )}
+              </div>
+              <div className="text-xs text-gray-500">{formatArguments(toolCall.arguments)}</div>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`text-xs font-medium ${getStatusColor()}`}>
-            {getStatusText()}
-          </span>
-          {toolResult?.duration_ms && (
-            <span className="text-xs text-gray-400">
-              {toolResult.duration_ms}ms
+          <div className="flex items-center gap-2">
+            <span className={`text-xs font-medium ${getStatusColor()}`}>
+              {getStatusText()}
             </span>
-          )}
-          {isExpanded ? 
-            <ChevronDown className="w-4 h-4 text-gray-400" /> : 
-            <ChevronRight className="w-4 h-4 text-gray-400" />
-          }
-        </div>
-      </button>
+            {toolResult?.duration_ms && (
+              <span className="text-xs text-gray-400">
+                {formatDuration(toolResult.duration_ms)}
+              </span>
+            )}
+            {isExpanded ? 
+              <ChevronDown className="w-4 h-4 text-gray-400" /> : 
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+            }
+          </div>
+        </button>
+        
+        {/* Quick action button for discussions */}
+        {onLoadDetails && toolResult && (toolCall.tool === 'runDiscussion' || toolCall.tool === 'createAgent') && (
+          <button
+            onClick={() => onLoadDetails(toolCall, toolResult)}
+            className="px-4 border-l flex items-center gap-2 hover:bg-blue-50 transition-colors group"
+            title="View in new tab"
+          >
+            <ExternalLink className="w-4 h-4 text-gray-400 group-hover:text-blue-600" />
+            <span className="text-sm text-gray-600 group-hover:text-blue-600">View</span>
+          </button>
+        )}
+      </div>
       
       {isExpanded && (
         <div className="border-t p-3 bg-gray-50">
@@ -111,9 +133,9 @@ export default function ToolCard({ toolCall, toolResult, isPending }: ToolCardPr
             {/* Arguments */}
             <div>
               <div className="text-xs font-medium text-gray-700 mb-1">Arguments:</div>
-              <pre className="text-xs bg-white p-2 rounded border overflow-x-auto">
-                {JSON.stringify(toolCall.arguments, null, 2)}
-              </pre>
+              <div className="bg-white p-2 rounded border overflow-x-auto">
+                <JsonTreeViewer data={toolCall.arguments} defaultExpanded={true} />
+              </div>
             </div>
             
             {/* Result or Error */}
@@ -122,18 +144,35 @@ export default function ToolCard({ toolCall, toolResult, isPending }: ToolCardPr
                 <div className="text-xs font-medium text-gray-700 mb-1">
                   {toolResult.success ? 'Result:' : 'Error:'}
                 </div>
-                <pre className="text-xs bg-white p-2 rounded border overflow-x-auto max-h-60">
-                  {toolResult.success 
-                    ? JSON.stringify(toolResult.result, null, 2)
-                    : toolResult.error
-                  }
-                </pre>
+                <div className="bg-white p-2 rounded border overflow-x-auto max-h-96">
+                  {toolResult.success ? (
+                    <JsonTreeViewer data={toolResult.result} defaultExpanded={false} />
+                  ) : (
+                    <div className="text-xs text-red-600 whitespace-pre-wrap">
+                      {toolResult.error}
+                    </div>
+                  )}
+                </div>
               </div>
             )}
             
-            {/* Tool Call ID for debugging */}
-            <div className="text-xs text-gray-400">
-              ID: {toolCall.tool_call_id}
+            {/* Load Details Button */}
+            {onLoadDetails && toolResult && (
+              <div className="mt-3 pt-3 border-t">
+                <button
+                  onClick={() => onLoadDetails(toolCall, toolResult)}
+                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                  <span>Load Details in New Tab</span>
+                </button>
+              </div>
+            )}
+            
+            {/* Tool Call ID - subtle visual element */}
+            <div className="text-xs text-gray-300 mt-3 flex items-center gap-1">
+              <Eye className="w-3 h-3" />
+              <span>{toolCall.tool_call_id.slice(0, 8)}...</span>
             </div>
           </div>
         </div>

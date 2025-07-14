@@ -6,7 +6,8 @@ import { api } from '@/lib/api-client'
 import { getBrowserClient } from '@/lib/supabase-browser'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import OrchestrationPanel from './OrchestrationPanel'
+import OrchestrationExperience from './OrchestrationExperience'
+import { useOrchestrationStore } from '@/stores/orchestration-store'
 
 interface Message {
   id: string
@@ -22,17 +23,32 @@ interface Message {
 interface ChatInterfaceProps {
   sessionId?: string | null
   onThreadCreated?: (threadId: string) => void
+  onOpenOrchestration?: (orchestrationId: string, title?: string) => void
 }
 
-export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterfaceProps) {
+export default function ChatInterface({ sessionId, onThreadCreated, onOpenOrchestration }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [currentOrchestrationId, setCurrentOrchestrationId] = useState<string | null>(null)
-  const [showOrchestrationPanel, setShowOrchestrationPanel] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  
+  // Get orchestration state and actions from Zustand store
+  const {
+    currentOrchestrationId,
+    showOrchestrationPanel,
+    setCurrentOrchestrationId,
+    setShowOrchestrationPanel,
+    addOrchestrationToThread,
+    loadOrchestrationsByThread,
+    subscribeToSession,
+    loadSession,
+    getSessionData
+  } = useOrchestrationStore()
+  
+  // Get current orchestration session data
+  const currentOrchestrationData = currentOrchestrationId ? getSessionData(currentOrchestrationId) : null
 
   // Keep track of the previous sessionId to avoid unnecessary reloads
   const prevSessionIdRef = useRef<string | null>(null)
@@ -41,20 +57,15 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
   useEffect(() => {
     // Only load if sessionId actually changed
     if (sessionId && sessionId !== prevSessionIdRef.current) {
-      // Don't load messages if this is a new thread (messages will be empty anyway)
-      const isNewThread = sessionId.includes('-') && messages.length > 0 && 
-                         messages[messages.length - 1].role === 'assistant'
+      // Clear messages first when switching threads
+      setMessages([])
       
-      if (!isNewThread) {
-        // Load messages first, THEN check for active orchestrations
-        loadThreadMessages().then(() => {
-          // Check for active orchestration sessions after messages are loaded
-          checkActiveOrchestrations()
-        })
-      } else {
-        // For new threads, just check active orchestrations
+      // Always load messages for existing threads
+      loadThreadMessages().then(() => {
+        // Check for active orchestration sessions after messages are loaded
         checkActiveOrchestrations()
-      }
+      })
+      
       prevSessionIdRef.current = sessionId
     } else if (!sessionId) {
       setMessages([])
@@ -70,16 +81,24 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       console.log('[ChatInterface] Loading thread messages for:', sessionId)
       const response = await api.threads.get(sessionId)
       console.log('[ChatInterface] API response:', {
+        hasResponse: !!response,
         hasThread: !!response?.thread,
         hasMessages: !!response?.messages,
         messageCount: response?.messages?.length,
         rawResponse: response
       })
       
-      const { thread, messages: threadMessages } = response || {}
+      // Handle the case where response might be null/undefined
+      if (!response) {
+        console.error('[ChatInterface] No response from API')
+        return
+      }
+      
+      const { thread, messages: threadMessages } = response
       
       console.log('[ChatInterface] Loaded thread messages:', {
         sessionId,
+        hasThread: !!thread,
         messageCount: threadMessages?.length,
         messages: threadMessages?.map((msg: any) => ({
           id: msg.id,
@@ -123,9 +142,13 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         )
         
         setMessages(mappedMessages)
+      } else {
+        console.log('[ChatInterface] No messages found for thread')
+        setMessages([])
       }
     } catch (error) {
       console.error('Failed to load thread messages:', error)
+      setMessages([])
     }
   }
   
@@ -135,6 +158,9 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
     console.log('[ChatInterface] Checking for active orchestrations for thread:', sessionId)
     
     try {
+      // Use Zustand store to load orchestrations for this thread
+      await loadOrchestrationsByThread(sessionId)
+      
       const supabase = getBrowserClient()
       
       // Find ALL orchestration sessions for this thread (not just active)
@@ -163,6 +189,9 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
           toolState: activeSession.tool_state,
           messagesCount: activeSession.messages?.length
         })
+        
+        // Add orchestration to thread mapping
+        addOrchestrationToThread(sessionId, activeSession.id)
         
         // Set current orchestration session
         setCurrentOrchestrationId(activeSession.id)
@@ -215,13 +244,16 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
             
             // Set loading state
             setIsLoading(true)
-            // Also set current orchestration ID
-            setCurrentOrchestrationId(activeSession.id)
+            
+            // Load the session in the store
+            loadSession(activeSession.id)
           } else {
             // We have messages already - just ensure the orchestrationSessionId is set
             console.log('[ChatInterface] Updating existing messages with orchestration ID')
-            setCurrentOrchestrationId(activeSession.id)
             setIsLoading(true) // Also set loading for existing messages
+            
+            // Load the session in the store
+            loadSession(activeSession.id)
           }
         }
         
@@ -229,6 +261,59 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         setupOrchestrationSubscription(activeSession.id)
       } else {
         console.log('[ChatInterface] No active orchestration sessions found')
+        
+        // Check for recently completed sessions that might have finished while disconnected
+        const recentlyCompleted = allSessions?.filter(s => 
+          s.status === 'completed' && 
+          s.final_response &&
+          // Completed in the last 15 minutes
+          new Date(s.completed_at).getTime() > Date.now() - 15 * 60 * 1000
+        ) || []
+        
+        if (recentlyCompleted.length > 0) {
+          const completedSession = recentlyCompleted[0]
+          console.log('[ChatInterface] Found recently completed orchestration:', {
+            id: completedSession.id,
+            completedAt: completedSession.completed_at,
+            hasResponse: !!completedSession.final_response
+          })
+          
+          // Add orchestration to thread mapping
+          addOrchestrationToThread(sessionId, completedSession.id)
+          
+          // Check if we already have this response in messages
+          const hasResponse = messages.some(msg => 
+            msg.orchestrationSessionId === completedSession.id && 
+            msg.role === 'assistant' &&
+            msg.content !== '🤔 Thinking...' &&
+            msg.content !== '⚡ Processing...'
+          )
+          
+          if (!hasResponse && completedSession.final_response) {
+            try {
+              const finalResponse = JSON.parse(completedSession.final_response)
+              const assistantMessage: Message = {
+                id: completedSession.id,
+                role: 'assistant',
+                content: finalResponse.content || finalResponse,
+                timestamp: new Date(completedSession.completed_at),
+                orchestrationSessionId: completedSession.id
+              }
+              
+              setMessages(prev => {
+                // Remove any thinking messages for this session
+                const filtered = prev.filter(msg => 
+                  !(msg.id === completedSession.id && (msg.content === '🤔 Thinking...' || msg.content === '⚡ Processing...'))
+                )
+                return [...filtered, assistantMessage]
+              })
+              
+              console.log('[ChatInterface] Added completed orchestration response to messages')
+            } catch (e) {
+              console.error('[ChatInterface] Failed to parse completed session response:', e)
+            }
+          }
+        }
       }
     } catch (error) {
       console.error('Failed to check active orchestrations:', error)
@@ -237,100 +322,8 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
   
   const setupOrchestrationSubscription = (sessionId: string) => {
     console.log(`[ChatInterface] Setting up realtime subscription for session ${sessionId}`)
-    const supabase = getBrowserClient()
-    const channel = supabase
-      .channel(`orchestration:${sessionId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orchestration_sessions',
-          filter: `id=eq.${sessionId}`
-        },
-        handleOrchestrationUpdate
-      )
-      .subscribe()
-    
-    // Store channel reference for cleanup
-    ;(channel as any).orchestrationSessionId = sessionId
-  }
-  
-  const handleOrchestrationUpdate = async (payload: any) => {
-    const session = payload.new as any
-    const sessionId = session.id
-    const supabase = getBrowserClient()
-    
-    console.log('[ChatInterface] Orchestration update received:', {
-      sessionId,
-      status: session.status,
-      hasFinalResponse: !!session.final_response
-    })
-    
-    if (session.status === 'completed') {
-      // Fetch the complete session data
-      try {
-        const { data: completeSession, error } = await supabase
-          .from('orchestration_sessions')
-          .select('*')
-          .eq('id', sessionId)
-          .single()
-        
-        if (error || !completeSession) {
-          throw new Error(`Failed to fetch complete session: ${error?.message}`)
-        }
-        
-        if (completeSession.final_response) {
-          const finalResponse = JSON.parse(completeSession.final_response)
-          
-          // Update the thinking message with the actual response
-          setMessages(prev => prev.map(msg => 
-            msg.id === sessionId
-              ? { 
-                  ...msg, 
-                  content: finalResponse.content || finalResponse,
-                  timestamp: new Date()
-                }
-              : msg
-          ))
-          
-          // If a thread was created by the orchestrator, notify parent
-          if (finalResponse.threadId && onThreadCreated && !sessionId) {
-            onThreadCreated(finalResponse.threadId)
-          }
-        }
-      } catch (e) {
-        console.error('[ChatInterface] Error fetching complete session:', e)
-      }
-      
-      setIsLoading(false)
-      
-      // Unsubscribe from this session's channel
-      supabase.channel(`orchestration:${sessionId}`).unsubscribe()
-    } else if (session.status === 'failed') {
-      // Update message to show error
-      setMessages(prev => prev.map(msg => 
-        msg.id === sessionId
-          ? { 
-              ...msg, 
-              content: session.error || 'An error occurred processing your request.',
-              error: true,
-              timestamp: new Date()
-            }
-          : msg
-      ))
-      setIsLoading(false)
-      
-      // Unsubscribe from this session's channel
-      supabase.channel(`orchestration:${sessionId}`).unsubscribe()
-    } else if (session.status === 'running') {
-      // Update status to show it's being processed
-      setMessages(prev => prev.map(msg => 
-        msg.id === sessionId
-          ? { ...msg, content: '⚡ Processing...' }
-          : msg
-      ))
-    }
+    // Use the Zustand store's subscription management
+    subscribeToSession(sessionId)
   }
 
   const scrollToBottom = () => {
@@ -348,6 +341,100 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
       textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
     }
   }, [input])
+  
+  // Monitor orchestration session status changes
+  useEffect(() => {
+    if (!currentOrchestrationData || !currentOrchestrationId) return
+    
+    const sessionInfo = currentOrchestrationData.info
+    if (!sessionInfo) return
+    
+    console.log('[ChatInterface] Orchestration status changed:', {
+      id: currentOrchestrationId,
+      status: sessionInfo.status,
+      hasError: !!sessionInfo.error
+    })
+    
+    if (sessionInfo.status === 'completed') {
+      // Clear timeout if exists
+      const timeoutId = (window as any)[`orchestration-timeout-${currentOrchestrationId}`]
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        delete (window as any)[`orchestration-timeout-${currentOrchestrationId}`]
+      }
+      
+      // Fetch the complete session data to get final response
+      const fetchCompleteSession = async () => {
+        const supabase = getBrowserClient()
+        console.log(`[ChatInterface] Session completed, fetching full data for ${currentOrchestrationId}`)
+        try {
+          const { data: completeSession, error } = await supabase
+            .from('orchestration_sessions')
+            .select('*')
+            .eq('id', currentOrchestrationId)
+            .single()
+          
+          if (error || !completeSession) {
+            throw new Error(`Failed to fetch complete session: ${error?.message}`)
+          }
+          
+          if (completeSession.final_response) {
+            const finalResponse = JSON.parse(completeSession.final_response)
+            console.log('[ChatInterface] Updating message with final response')
+            
+            // Update the thinking message with the actual response
+            setMessages(prev => prev.map(msg => 
+              msg.id === currentOrchestrationId
+                ? { 
+                    ...msg, 
+                    content: finalResponse.content || finalResponse,
+                    timestamp: new Date()
+                  }
+                : msg
+            ))
+            
+            // If a thread was created by the orchestrator, notify parent
+            if (finalResponse.threadId && onThreadCreated && !sessionId) {
+              onThreadCreated(finalResponse.threadId)
+            }
+          }
+        } catch (e) {
+          console.error('[ChatInterface] Error fetching complete session:', e)
+        }
+        
+        setIsLoading(false)
+      }
+      
+      fetchCompleteSession()
+    } else if (sessionInfo.status === 'failed') {
+      // Clear timeout if exists
+      const timeoutId = (window as any)[`orchestration-timeout-${currentOrchestrationId}`]
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+        delete (window as any)[`orchestration-timeout-${currentOrchestrationId}`]
+      }
+      
+      // Update message to show error
+      setMessages(prev => prev.map(msg => 
+        msg.id === currentOrchestrationId
+          ? { 
+              ...msg, 
+              content: sessionInfo.error || 'An error occurred processing your request.',
+              error: true,
+              timestamp: new Date()
+            }
+          : msg
+      ))
+      setIsLoading(false)
+    } else if (sessionInfo.status === 'running' || sessionInfo.status === 'pending') {
+      // Update status to show it's being processed
+      setMessages(prev => prev.map(msg => 
+        msg.id === currentOrchestrationId
+          ? { ...msg, content: '⚡ Processing...' }
+          : msg
+      ))
+    }
+  }, [currentOrchestrationData?.info?.status, currentOrchestrationId, sessionId, onThreadCreated])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -384,14 +471,19 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         onThreadCreated(response.threadId)
       }
       
-      // Check if this is an async response (status: 'processing' indicates async)
+      // Check if this is an async response (status: 'pending' or 'running' indicates async)
       // The Edge Function returns { success: true, data: { sessionId, status, ... } }
       const responseData = response.data || response
-      if ((responseData.async || responseData.status === 'processing') && responseData.sessionId) {
+      if ((responseData.async || responseData.status === 'pending' || responseData.status === 'running') && responseData.sessionId) {
         console.log('[ChatInterface] Async response detected, setting up realtime')
         
         // Set current orchestration session
         setCurrentOrchestrationId(responseData.sessionId)
+        
+        // Add orchestration to thread mapping
+        if (sessionId) {
+          addOrchestrationToThread(sessionId, responseData.sessionId)
+        }
         
         // Create a placeholder message with thinking indicator
         const thinkingMessage: Message = {
@@ -410,165 +502,28 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
           return [...filtered, thinkingMessage]
         })
         
-        // Use Supabase Realtime to subscribe to orchestration updates
-        console.log(`[ChatInterface] Setting up realtime subscription for session ${responseData.sessionId}`)
-        const supabase = getBrowserClient()
-        const channel = supabase
-          .channel(`orchestration:${responseData.sessionId}`)
-          .on(
-            'postgres_changes',
-            {
-              event: 'UPDATE',
-              schema: 'public',
-              table: 'orchestration_sessions',
-              filter: `id=eq.${responseData.sessionId}`
-            },
-            (payload) => {
-              console.log('[ChatInterface] Orchestration update received:', {
-                eventType: payload.eventType,
-                status: payload.new?.status,
-                hasFinalResponse: !!payload.new?.final_response,
-                finalResponseLength: payload.new?.final_response?.length,
-                timestamp: new Date().toISOString()
-              })
-              const session = payload.new as any
-              
-              if (session.status === 'completed') {
-                // Fetch the complete session data since realtime might truncate large text fields
-                const fetchCompleteSession = async () => {
-                  console.log(`[ChatInterface] Session completed, fetching full data for ${responseData.sessionId}`)
-                  try {
-                    const { data: completeSession, error } = await supabase
-                      .from('orchestration_sessions')
-                      .select('*')
-                      .eq('id', responseData.sessionId)
-                      .single()
-                    
-                    console.log('[ChatInterface] Fetched complete session:', {
-                      hasData: !!completeSession,
-                      hasFinalResponse: !!completeSession?.final_response,
-                      finalResponseLength: completeSession?.final_response?.length,
-                      error
-                    })
-                    
-                    if (error || !completeSession) {
-                      throw new Error(`Failed to fetch complete session: ${error?.message}`)
-                    }
-                    
-                    if (completeSession.final_response) {
-                      const finalResponse = JSON.parse(completeSession.final_response)
-                      console.log('[ChatInterface] Parsed final response:', {
-                        hasContent: !!finalResponse.content,
-                        hasThreadId: !!finalResponse.threadId,
-                        contentPreview: finalResponse.content?.substring(0, 100) + '...'
-                      })
-                      // Update the thinking message with the actual response
-                      setMessages(prev => prev.map(msg => 
-                        msg.id === responseData.sessionId
-                          ? { 
-                              ...msg, 
-                              content: finalResponse.content || finalResponse,
-                              timestamp: new Date()
-                            }
-                          : msg
-                      ))
-                      
-                      // If a thread was created by the orchestrator, notify parent
-                      if (finalResponse.threadId && onThreadCreated && !sessionId) {
-                        console.log('[ChatInterface] Notifying parent of new thread:', finalResponse.threadId)
-                        onThreadCreated(finalResponse.threadId)
-                      }
-                    } else {
-                      console.warn('[ChatInterface] Complete session has no final_response')
-                    }
-                  } catch (e) {
-                    console.error('[ChatInterface] Error fetching complete session:', e)
-                    // Fallback to the truncated response if available
-                    if (session.final_response) {
-                      try {
-                        const finalResponse = JSON.parse(session.final_response)
-                        setMessages(prev => prev.map(msg => 
-                          msg.id === responseData.sessionId
-                            ? { 
-                                ...msg, 
-                                content: finalResponse.content || finalResponse,
-                                timestamp: new Date()
-                              }
-                            : msg
-                        ))
-                      } catch (parseError) {
-                        // If parsing fails, use the raw response
-                        setMessages(prev => prev.map(msg => 
-                          msg.id === responseData.sessionId
-                            ? { 
-                                ...msg, 
-                                content: session.final_response || 'Response completed',
-                                timestamp: new Date()
-                              }
-                            : msg
-                        ))
-                      }
-                    }
-                  }
-                  
-                  // Clear timeout
-                  if ((channel as any).timeoutId) {
-                    clearTimeout((channel as any).timeoutId)
-                  }
-                  channel.unsubscribe()
-                  setIsLoading(false)
-                }
-                
-                fetchCompleteSession()
-              } else if (session.status === 'failed') {
-                // Handle error
-                setMessages(prev => prev.map(msg => 
-                  msg.id === responseData.sessionId
-                    ? { 
-                        ...msg, 
-                        content: session.error || 'An error occurred processing your request.',
-                        error: true,
-                        timestamp: new Date()
-                      }
-                    : msg
-                ))
-                channel.unsubscribe()
-                setIsLoading(false)
-              } else if (session.status === 'running') {
-                // Update status to show it's being processed
-                setMessages(prev => prev.map(msg => 
-                  msg.id === responseData.sessionId
-                    ? { ...msg, content: '⚡ Processing...' }
-                    : msg
-                ))
-              } else {
-                console.log(`[ChatInterface] Unhandled session status: ${session.status}`)
-              }
-            }
-          )
-          .subscribe((status) => {
-            console.log(`[ChatInterface] Realtime subscription status: ${status}`)
-          })
+        // Load the session in the store and subscribe to updates
+        loadSession(responseData.sessionId)
         
-        // Store timeout for cleanup
+        // Store timeout for cleanup - 13 minutes (just under Lambda's 14 minute timeout)
         const timeoutId = setTimeout(() => {
-          // Timeout after 5 minutes
-          channel.unsubscribe()
+          console.log(`[ChatInterface] Client timeout reached for session ${responseData.sessionId}`)
           setMessages(prev => prev.map(msg => 
             msg.id === responseData.sessionId
               ? { 
                   ...msg, 
-                  content: 'Request timed out. Please try again.',
+                  content: 'The request is taking longer than expected. It may still be processing in the background. Please check back in a few minutes or try a simpler request.',
                   error: true,
                   timestamp: new Date()
                 }
               : msg
           ))
           setIsLoading(false)
-        }, 5 * 60 * 1000)
+          setCurrentOrchestrationId(null)
+        }, 13 * 60 * 1000) // 13 minutes timeout
         
-        // Store cleanup function on the channel
-        ;(channel as any).timeoutId = timeoutId
+        // Store timeout reference for cleanup
+        ;(window as any)[`orchestration-timeout-${responseData.sessionId}`] = timeoutId
       } else {
         // Sync response (shouldn't happen anymore)
         console.log('[ChatInterface] Unexpected sync response')
@@ -684,9 +639,16 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                       {message.orchestrationSessionId && message.role === 'assistant' && (
                         <button
                           onClick={() => {
-                            console.log('[ChatInterface] Opening orchestration panel for:', message.orchestrationSessionId)
-                            setCurrentOrchestrationId(message.orchestrationSessionId!)
-                            setShowOrchestrationPanel(true)
+                            console.log('[ChatInterface] Opening orchestration tab for:', message.orchestrationSessionId)
+                            if (onOpenOrchestration) {
+                              // Extract a title from the message if possible
+                              const title = message.content.split('\n')[0].substring(0, 50)
+                              onOpenOrchestration(message.orchestrationSessionId!, title)
+                            } else {
+                              // Fallback to old behavior if no callback provided
+                              setCurrentOrchestrationId(message.orchestrationSessionId!)
+                              setShowOrchestrationPanel(true)
+                            }
                           }}
                           className="flex items-center gap-1 text-blue-500 hover:text-blue-600 transition-colors"
                         >
@@ -781,12 +743,15 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         </form>
       </div>
       
-      {/* Orchestration Panel */}
-      <OrchestrationPanel
-        sessionId={currentOrchestrationId}
-        isVisible={showOrchestrationPanel}
-        onClose={() => setShowOrchestrationPanel(false)}
-      />
+      {/* Orchestration Panel - Only show if no tab callback provided */}
+      {!onOpenOrchestration && (
+        <OrchestrationExperience
+          sessionId={currentOrchestrationId}
+          isVisible={showOrchestrationPanel}
+          onClose={() => setShowOrchestrationPanel(false)}
+          fullScreen={false}
+        />
+      )}
     </div>
   )
 }
