@@ -114,12 +114,17 @@ export const useChatStore = create<ChatStore>()(
       selectThread: (threadId) => {
         const { tabs, activeTabId } = get()
         
+        console.log('[selectThread] Called with threadId:', threadId)
+        console.log('[selectThread] Current tabs:', tabs)
+        console.log('[selectThread] Current activeTabId:', activeTabId)
+        
         // Update the selected thread
         set({ selectedThreadId: threadId })
         
         // Find the active chat tab and update its sessionId
         const activeChatTab = tabs.find(tab => tab.type === 'chat' && tab.id === activeTabId)
         if (activeChatTab) {
+          console.log('[selectThread] Found active chat tab:', activeChatTab)
           set(state => ({
             tabs: state.tabs.map(tab => 
               tab.id === activeChatTab.id 
@@ -127,9 +132,10 @@ export const useChatStore = create<ChatStore>()(
                 : tab
             )
           }))
-        } else if (threadId) {
+        } else {
           // If no chat tab is active, find any chat tab and activate it
           const anyChatTab = tabs.find(tab => tab.type === 'chat')
+          console.log('[selectThread] No active chat tab, found any chat tab:', anyChatTab)
           if (anyChatTab) {
             set(state => ({
               tabs: state.tabs.map(tab => 
@@ -137,21 +143,33 @@ export const useChatStore = create<ChatStore>()(
                   ? { ...tab, sessionId: threadId }
                   : tab
               ),
-              activeTabId: anyChatTab.id
+              activeTabId: anyChatTab.id,
+              tabHistory: [...state.tabHistory.filter(id => id !== anyChatTab.id), anyChatTab.id]
             }))
           }
         }
         
-        // Update URL
-        if (threadId) {
-          window.history.pushState({}, '', `/chat/${threadId}`)
-        } else {
-          window.history.pushState({}, '', '/chat')
-        }
+        // URL updates are now handled by the components using Next.js router
       },
       
       createNewChat: () => {
-        get().selectThread(null)
+        console.log('[createNewChat] Called')
+        // Clear the selected thread
+        set({ selectedThreadId: null })
+        
+        // Find the active chat tab and clear its sessionId
+        const { tabs, activeTabId } = get()
+        const activeChatTab = tabs.find(tab => tab.type === 'chat' && tab.id === activeTabId)
+        if (activeChatTab) {
+          console.log('[createNewChat] Clearing session from active chat tab')
+          set(state => ({
+            tabs: state.tabs.map(tab => 
+              tab.id === activeChatTab.id 
+                ? { ...tab, sessionId: null }
+                : tab
+            )
+          }))
+        }
       },
       
       deleteThread: async (threadId) => {

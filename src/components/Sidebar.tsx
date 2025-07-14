@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { ChevronDown, MessageSquare, Trash2, Edit2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { getBrowserClient } from '@/lib/supabase-browser'
 import { useChatStore } from '@/stores/chat-store'
@@ -13,6 +14,7 @@ interface SidebarProps {
 
 export default function Sidebar({}: SidebarProps) {
   const { user } = useAuth()
+  const router = useRouter()
   
   // Get all state and actions from chat store
   const {
@@ -95,7 +97,10 @@ export default function Sidebar({}: SidebarProps) {
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <button
-          onClick={createNewChat}
+          onClick={() => {
+            createNewChat()
+            router.push('/chat')
+          }}
           className="w-full bg-blue-600 text-white rounded-lg py-2.5 px-3 text-sm font-medium hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-sm"
         >
           <MessageSquare className="w-4 h-4" />
@@ -148,7 +153,10 @@ export default function Sidebar({}: SidebarProps) {
                     ) : (
                       <>
                         <button
-                          onClick={() => selectThread(thread.id)}
+                          onClick={() => {
+                            selectThread(thread.id)
+                            router.push(`/chat/${thread.id}`)
+                          }}
                           className="flex-1 text-left min-w-0 flex items-center"
                         >
                           <div className="flex-1 min-w-0">

@@ -287,7 +287,59 @@ After coding:
 
 ---
 
-## Rule 13: No Pushing with Failing Tests
+## Rule 13: Aggressive Logging for Debugging
+
+**ALWAYS add comprehensive logging to aid debugging:**
+
+```typescript
+// Log at key decision points
+console.log('[ComponentName] Action happening:', {
+  input: relevantInput,
+  state: currentState,
+  decision: whatWasDecided
+})
+
+// Log state changes
+console.log('[StoreName] State change:', {
+  action: 'updateThing',
+  before: oldValue,
+  after: newValue,
+  reason: 'user clicked button'
+})
+
+// Log API calls
+console.log('[API] Calling endpoint:', {
+  method: 'POST',
+  url: '/api/endpoint',
+  payload: data
+})
+
+// Log errors with context
+console.error('[Component] Error occurred:', {
+  error: error.message,
+  context: { userId, sessionId, action },
+  stack: error.stack
+})
+```
+
+**Logging Guidelines:**
+- Use consistent prefixes: `[ComponentName]` or `[StoreName]`
+- Log objects, not just strings - include relevant state
+- Log BEFORE and AFTER state changes
+- Log all branching decisions (if/else outcomes)
+- Log all effect triggers with their dependencies
+- Include timestamps for async operations
+- Keep logs in production - they help diagnose user issues
+
+**Good logging helps us:**
+- Debug issues without reproducing them
+- Understand user behavior patterns
+- Track down race conditions
+- Verify state management is working correctly
+
+---
+
+## Rule 14: No Pushing with Failing Tests
 
 **NEVER push code with failing tests:**
 

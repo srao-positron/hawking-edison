@@ -141,6 +141,7 @@ interface OrchestrationActions {
   setShowOrchestrationPanel: (show: boolean) => void
   addOrchestrationToThread: (threadId: string, orchestrationId: string) => void
   loadOrchestrationsByThread: (threadId: string) => Promise<void>
+  cancelOrchestration: (sessionId: string) => Promise<void>
   
   // Thread management
   setSelectedThreadId: (threadId: string | null) => void
@@ -790,6 +791,51 @@ export const useOrchestrationStore = create<OrchestrationStore>()(
       getOrchestrationsByThread: (threadId) => {
         const state = get()
         return state.orchestrationsByThread.get(threadId) || []
+      },
+      
+      cancelOrchestration: async (sessionId) => {
+        console.log('[OrchestrationStore] Canceling orchestration:', sessionId)
+        const supabase = getBrowserClient()
+        
+        try {
+          // Update session status to failed with cancellation message
+          const { error } = await supabase
+            .from('orchestration_sessions')
+            .update({
+              status: 'failed',
+              error: 'Cancelled by user',
+              completed_at: new Date().toISOString()
+            })
+            .eq('id', sessionId)
+            .in('status', ['pending', 'running', 'resuming'])
+          
+          if (error) throw error
+          
+          // Update local state
+          set(state => {
+            const sessions = new Map(state.sessions)
+            const existingSession = sessions.get(sessionId)
+            if (existingSession) {
+              sessions.set(sessionId, {
+                ...existingSession,
+                status: 'failed',
+                error: 'Cancelled by user',
+                completedAt: new Date().toISOString()
+              })
+            }
+            return { sessions }
+          })
+          
+          // Clear current orchestration if it's the one being cancelled
+          if (get().currentOrchestrationId === sessionId) {
+            set({ currentOrchestrationId: null })
+          }
+          
+          console.log('[OrchestrationStore] Orchestration cancelled successfully')
+        } catch (error) {
+          console.error('[OrchestrationStore] Failed to cancel orchestration:', error)
+          throw error
+        }
       }
     }))
   )

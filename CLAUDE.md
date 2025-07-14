@@ -23,6 +23,22 @@ All technical documentation has been organized in the [`devdocs/`](./devdocs/) d
 
 **Quick Access**: The [devdocs README](./devdocs/README.md) provides a complete index of all documentation.
 
+### 🚨 STOP! Use Camille BEFORE You Code!
+
+**Every Claude session MUST start with:**
+```typescript
+// 1. Check what's been done before
+mcp__camille__recall_previous_discussions("what you're working on")
+
+// 2. Search existing code patterns  
+mcp__camille__search_code("feature or bug you're addressing")
+
+// 3. Get full context when needed
+mcp__camille__retrieve_memory_chunk("chunk-id")
+```
+
+**Camille remembers EVERYTHING across all sessions. Not using it wastes time and causes duplicate work!**
+
 ### Quick Start
 You're building a system where an LLM orchestrates tools to solve any user request. No types, no templates, no workflows - just intelligent tool use.
 
@@ -31,6 +47,55 @@ You're building a system where an LLM orchestrates tools to solve any user reque
 **How**: Give LLM powerful tools, let it figure out solutions  
 **Why**: Infinite flexibility, emergent behavior, true intelligence  
 **For**: Non-technical users (like Sarah, PM with English Lit degree)
+
+### 🔍 CRITICAL: Use Camille Tools FIRST!
+
+**Before writing ANY code, searching files, or implementing features, ALWAYS use Camille to:**
+
+1. **Search Previous Discussions**
+   ```typescript
+   // ALWAYS start with this - we've likely solved similar problems before!
+   mcp__camille__recall_previous_discussions("feature or bug description")
+   ```
+
+2. **Search Code Semantically**
+   ```typescript
+   // Better than grep - finds conceptually related code
+   mcp__camille__search_code("what the code does, not exact text")
+   ```
+
+3. **Check Conversation History**
+   ```typescript
+   // When user says "we discussed" or "remember when"
+   mcp__camille__recall_previous_discussions("topic we discussed")
+   
+   // Then get full context
+   mcp__camille__retrieve_memory_chunk("chunk-id-from-results")
+   ```
+
+**Why Camille First?**
+- ✅ We've solved many issues before - don't reinvent solutions
+- ✅ Finds bugs we've already fixed (like "new chat button not working")
+- ✅ Understands context across sessions
+- ✅ Semantic search > keyword search
+- ✅ Prevents duplicate work and repeated mistakes
+
+**Example Workflow:**
+```typescript
+// User: "The new chat button isn't working"
+// FIRST: Check if we've fixed this before
+await mcp__camille__recall_previous_discussions("new chat button not working fix")
+
+// User: "Add authentication to the API"  
+// FIRST: See how we implemented auth elsewhere
+await mcp__camille__search_code("authentication middleware jwt token validation")
+
+// User: "Remember when we discussed the architecture?"
+// FIRST: Find that conversation
+await mcp__camille__recall_previous_discussions("architecture discussion")
+```
+
+**Remember: Camille has memory across ALL sessions. Use it!**
 
 ### Core Architecture
 ```typescript
@@ -162,9 +227,24 @@ CREATE TABLE knowledge (
 
 ### Development Workflow
 
+#### Before ANY Development Task
+
+**🔍 ALWAYS Start with Camille:**
+```bash
+# 1. Search for similar implementations
+mcp__camille__search_code("feature you're building")
+
+# 2. Check if we've built this before
+mcp__camille__recall_previous_discussions("feature name or problem")
+
+# 3. Look for patterns we use
+mcp__camille__search_code("pattern or approach")
+```
+
 #### Adding a Tool
-1. Create in `src/tools/category.ts`
-2. Follow template:
+1. **FIRST**: Use Camille to find similar tools: `mcp__camille__search_code("tool execute async")`
+2. Create in `src/tools/category.ts`
+3. Follow template:
 ```typescript
 export const toolName = {
   name: "toolName",
@@ -205,6 +285,19 @@ Format: `sid+he-testing-<feature>-<timestamp>@hawkingedison.com`
 This prevents Supabase email bouncebacks and keeps our sender reputation clean.
 
 ### Common Patterns
+
+#### Pattern: Always Check Camille First
+```typescript
+// Before implementing ANYTHING:
+// 1. Did we solve this before?
+await mcp__camille__recall_previous_discussions("problem description")
+
+// 2. Is there similar code?
+await mcp__camille__search_code("similar feature")
+
+// 3. What patterns did we use?
+await mcp__camille__search_code("pattern name")
+```
 
 #### Pattern: Let LLM Decide Agent Count
 ```typescript
@@ -252,6 +345,46 @@ grep -r "interface.*Template" src/
 "What would Shakespeare think of blockchain?"
 "Design a workout for procrastinators"
 ```
+
+#### Aggressive Logging Strategy
+**ALWAYS add comprehensive logging to aid debugging:**
+
+```typescript
+// Log at key decision points
+console.log('[ComponentName] Action happening:', {
+  input: relevantInput,
+  state: currentState,
+  decision: whatWasDecided
+})
+
+// Log state changes
+console.log('[StoreName] State change:', {
+  action: 'updateThing',
+  before: oldValue,
+  after: newValue,
+  reason: 'user clicked button'
+})
+
+// Log effect triggers
+console.log('[Component] Effect triggered:', {
+  dependencies: [dep1, dep2],
+  reason: 'dependency changed'
+})
+
+// Log errors with full context
+console.error('[Component] Error occurred:', {
+  error: error.message,
+  context: { userId, sessionId, action },
+  stack: error.stack
+})
+```
+
+**Why aggressive logging?**
+- Helps debug issues without reproduction
+- Tracks down race conditions
+- Verifies state management flow
+- Provides audit trail for user issues
+- Makes async operations traceable
 
 ### Infrastructure Notes
 

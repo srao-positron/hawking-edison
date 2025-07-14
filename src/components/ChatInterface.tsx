@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { Send, Paperclip, Sparkles, Info } from 'lucide-react'
+import { Send, Paperclip, Sparkles, Info, X } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import { getBrowserClient } from '@/lib/supabase-browser'
 import ReactMarkdown from 'react-markdown'
@@ -44,7 +44,8 @@ export default function ChatInterface({ sessionId, onThreadCreated, onOpenOrches
     loadOrchestrationsByThread,
     subscribeToSession,
     loadSession,
-    getSessionData
+    getSessionData,
+    cancelOrchestration
   } = useOrchestrationStore()
   
   // Get current orchestration session data
@@ -55,22 +56,29 @@ export default function ChatInterface({ sessionId, onThreadCreated, onOpenOrches
   
   // Load messages when sessionId changes
   useEffect(() => {
-    // Only load if sessionId actually changed
-    if (sessionId && sessionId !== prevSessionIdRef.current) {
-      // Clear messages first when switching threads
-      setMessages([])
-      
-      // Always load messages for existing threads
+    console.log('[ChatInterface] sessionId changed:', {
+      current: sessionId,
+      previous: prevSessionIdRef.current
+    })
+    
+    // Skip if sessionId hasn't actually changed
+    if (sessionId === prevSessionIdRef.current) {
+      return
+    }
+    
+    // Update the ref to track the new sessionId
+    prevSessionIdRef.current = sessionId ?? null
+    
+    // Clear messages when switching threads or starting new chat
+    setMessages([])
+    setIsLoading(false)
+    
+    // If we have a sessionId, load the thread messages
+    if (sessionId) {
       loadThreadMessages().then(() => {
         // Check for active orchestration sessions after messages are loaded
         checkActiveOrchestrations()
       })
-      
-      prevSessionIdRef.current = sessionId
-    } else if (!sessionId) {
-      setMessages([])
-      prevSessionIdRef.current = null
-      setIsLoading(false)
     }
   }, [sessionId])
   
@@ -465,15 +473,22 @@ export default function ChatInterface({ sessionId, onThreadCreated, onOpenOrches
         async: response.async || response.data?.async
       })
       
-      // If a new thread was created, notify parent
-      if (response.isNewThread && response.threadId && onThreadCreated) {
-        console.log('[ChatInterface] New thread created, notifying parent:', response.threadId)
-        onThreadCreated(response.threadId)
-      }
-      
       // Check if this is an async response (status: 'pending' or 'running' indicates async)
       // The Edge Function returns { success: true, data: { sessionId, status, ... } }
       const responseData = response.data || response
+      
+      // If a new thread was created, notify parent
+      if (response.isNewThread && response.threadId && onThreadCreated) {
+        console.log('[ChatInterface] New thread created, notifying parent:', response.threadId)
+        // Store the current orchestration ID before calling onThreadCreated
+        const orchestrationId = responseData.sessionId
+        onThreadCreated(response.threadId)
+        // Restore orchestration ID after navigation
+        if (orchestrationId) {
+          console.log('[ChatInterface] Restoring orchestration ID after thread creation:', orchestrationId)
+          setCurrentOrchestrationId(orchestrationId)
+        }
+      }
       if ((responseData.async || responseData.status === 'pending' || responseData.status === 'running') && responseData.sessionId) {
         console.log('[ChatInterface] Async response detected, setting up realtime')
         
@@ -611,13 +626,44 @@ export default function ChatInterface({ sessionId, onThreadCreated, onOpenOrches
                       >
                         {message.role === 'assistant' ? (
                           (message.content === '🤔 Thinking...' || message.content === '⚡ Processing...' || message.content === '🤔 Processing your request...') ? (
-                            <div className="flex items-center gap-2">
-                              <span>{message.content.split(' ')[0]}</span>
-                              <div className="flex gap-1">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span>{message.content.split(' ')[0]}</span>
+                                <div className="flex gap-1">
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                                </div>
                               </div>
+                              {message.orchestrationSessionId && (
+                                <button
+                                  onClick={async () => {
+                                    console.log('[ChatInterface] Cancelling orchestration:', message.orchestrationSessionId)
+                                    try {
+                                      await cancelOrchestration(message.orchestrationSessionId!)
+                                      // Update the message to show it was cancelled
+                                      setMessages(prev => prev.map(msg => 
+                                        msg.id === message.orchestrationSessionId
+                                          ? { 
+                                              ...msg, 
+                                              content: 'Cancelled by user',
+                                              error: true,
+                                              timestamp: new Date()
+                                            }
+                                          : msg
+                                      ))
+                                      setIsLoading(false)
+                                    } catch (error) {
+                                      console.error('[ChatInterface] Failed to cancel orchestration:', error)
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 text-xs text-red-500 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                  title="Cancel orchestration"
+                                >
+                                  <X className="w-3 h-3" />
+                                  <span>Cancel</span>
+                                </button>
+                              )}
                             </div>
                           ) : (
                             <div className="prose prose-sm max-w-none">

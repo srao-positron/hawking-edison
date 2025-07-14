@@ -4,7 +4,7 @@ import { useEffect, Suspense } from 'react'
 import Sidebar from '@/components/Sidebar'
 import TabManager from '@/components/TabManager'
 import { useAuth } from '@/hooks/useAuth'
-import { useRouter, useSearchParams, useParams } from 'next/navigation'
+import { useRouter, useSearchParams, useParams, usePathname } from 'next/navigation'
 import { useChatStore } from '@/stores/chat-store'
 
 function ChatPageContent() {
@@ -12,6 +12,7 @@ function ChatPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const params = useParams()
+  const pathname = usePathname()
   
   // Get all state from chat store
   const { 
@@ -28,10 +29,27 @@ function ChatPageContent() {
     const threadIdFromQuery = searchParams.get('thread')
     const threadId = threadIdFromPath || threadIdFromQuery
     
-    if (threadId && threadId !== selectedThreadId) {
+    console.log('[ChatPage] URL sync:', {
+      threadIdFromPath,
+      threadIdFromQuery,
+      threadId,
+      selectedThreadId,
+      pathname
+    })
+    
+    // If we're at /chat (not /chat/[threadId]), clear the selection
+    if (pathname === '/chat' && selectedThreadId) {
+      console.log('[ChatPage] At /chat root, clearing selection')
+      selectThread(null)
+    } else if (threadId && threadId !== selectedThreadId) {
+      console.log('[ChatPage] Selecting thread from URL:', threadId)
       selectThread(threadId)
+    } else if (!threadId && pathname === '/chat' && selectedThreadId) {
+      // Extra check: if no threadId in URL but we have a selection, clear it
+      console.log('[ChatPage] No thread in URL but have selection, clearing')
+      selectThread(null)
     }
-  }, [params.threadId, searchParams, selectedThreadId, selectThread])
+  }, [params.threadId, searchParams, selectedThreadId, selectThread, pathname])
 
   // Load threads on mount
   useEffect(() => {
