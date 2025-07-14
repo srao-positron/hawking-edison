@@ -46,12 +46,16 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                          messages[messages.length - 1].role === 'assistant'
       
       if (!isNewThread) {
-        loadThreadMessages()
+        // Load messages first, THEN check for active orchestrations
+        loadThreadMessages().then(() => {
+          // Check for active orchestration sessions after messages are loaded
+          checkActiveOrchestrations()
+        })
+      } else {
+        // For new threads, just check active orchestrations
+        checkActiveOrchestrations()
       }
       prevSessionIdRef.current = sessionId
-      
-      // Check for active orchestration sessions
-      checkActiveOrchestrations()
     } else if (!sessionId) {
       setMessages([])
       prevSessionIdRef.current = null
@@ -133,22 +137,25 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
     try {
       const supabase = getBrowserClient()
       
-      // Find any active orchestration sessions for this thread
-      const { data: activeSessions, error } = await supabase
+      // Find ALL orchestration sessions for this thread (not just active)
+      const { data: allSessions, error } = await supabase
         .from('orchestration_sessions')
         .select('*')
         .contains('tool_state', { thread_id: sessionId })
-        .in('status', ['pending', 'running', 'resuming'])
         .order('created_at', { ascending: false })
-        .limit(1)
       
-      console.log('[ChatInterface] Active orchestrations query result:', { 
-        hasData: !!activeSessions, 
-        count: activeSessions?.length,
+      console.log('[ChatInterface] All orchestrations query result:', { 
+        hasData: !!allSessions, 
+        count: allSessions?.length,
         error: error?.message 
       })
       
-      if (activeSessions && activeSessions.length > 0) {
+      // Filter to only active sessions
+      const activeSessions = allSessions?.filter(s => 
+        ['pending', 'running', 'resuming'].includes(s.status)
+      ) || []
+      
+      if (activeSessions.length > 0) {
         const activeSession = activeSessions[0]
         console.log('[ChatInterface] Found active orchestration session:', {
           id: activeSession.id,
@@ -166,6 +173,16 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         
         console.log('[ChatInterface] Last user message:', lastUserMessage?.content?.substring(0, 50))
         
+        // CRITICAL: Verify this orchestration is actually for THIS thread
+        const orchestrationThreadId = activeSession.tool_state?.thread_id
+        if (orchestrationThreadId !== sessionId) {
+          console.warn('[ChatInterface] Orchestration session is for different thread!', {
+            orchestrationThreadId,
+            currentThreadId: sessionId
+          })
+          return
+        }
+        
         // Check if we already have a message for this orchestration
         const hasOrchestrationMessage = messages.some(msg => 
           msg.orchestrationSessionId === activeSession.id
@@ -173,42 +190,39 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
         
         console.log('[ChatInterface] Has orchestration message already:', hasOrchestrationMessage)
         
-        if (!hasOrchestrationMessage && lastUserMessage) {
-          // First, add the user message if it's not already there
-          const hasUserMessage = messages.some(msg => 
-            msg.role === 'user' && msg.content === lastUserMessage.content
-          )
+        if (!hasOrchestrationMessage) {
+          // Only add thinking message if we don't have ANY assistant message yet
+          const hasAnyAssistantMessage = messages.some(msg => msg.role === 'assistant')
           
-          if (!hasUserMessage) {
-            const userMessage: Message = {
-              id: crypto.randomUUID(),
-              role: 'user',
-              content: lastUserMessage.content,
-              timestamp: new Date(activeSession.created_at),
-              error: false
+          if (!hasAnyAssistantMessage && lastUserMessage) {
+            // Only add the thinking message for the active orchestration
+            const thinkingMessage: Message = {
+              id: activeSession.id,
+              role: 'assistant',
+              content: activeSession.status === 'running' ? '⚡ Processing...' : '🤔 Thinking...',
+              timestamp: new Date(activeSession.started_at || activeSession.created_at),
+              error: false,
+              orchestrationSessionId: activeSession.id
             }
             setMessages(prev => {
-              console.log('[ChatInterface] Adding user message to UI')
-              return [...prev, userMessage]
+              console.log('[ChatInterface] Adding thinking message to UI with orchestrationSessionId:', activeSession.id)
+              // Remove any existing thinking messages first
+              const filtered = prev.filter(msg => 
+                !(msg.role === 'assistant' && (msg.content === '🤔 Thinking...' || msg.content === '⚡ Processing...'))
+              )
+              return [...filtered, thinkingMessage]
             })
+            
+            // Set loading state
+            setIsLoading(true)
+            // Also set current orchestration ID
+            setCurrentOrchestrationId(activeSession.id)
+          } else {
+            // We have messages already - just ensure the orchestrationSessionId is set
+            console.log('[ChatInterface] Updating existing messages with orchestration ID')
+            setCurrentOrchestrationId(activeSession.id)
+            setIsLoading(true) // Also set loading for existing messages
           }
-          
-          // Then add a thinking message for the active orchestration
-          const thinkingMessage: Message = {
-            id: activeSession.id,
-            role: 'assistant',
-            content: activeSession.status === 'running' ? '⚡ Processing...' : '🤔 Thinking...',
-            timestamp: new Date(activeSession.started_at || activeSession.created_at),
-            error: false,
-            orchestrationSessionId: activeSession.id
-          }
-          setMessages(prev => {
-            console.log('[ChatInterface] Adding thinking message to UI with orchestrationSessionId:', activeSession.id)
-            return [...prev, thinkingMessage]
-          })
-          
-          // Set loading state
-          setIsLoading(true)
         }
         
         // Set up realtime subscription for the active session
@@ -388,7 +402,13 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
           error: false,
           orchestrationSessionId: responseData.sessionId
         }
-        setMessages(prev => [...prev, thinkingMessage])
+        setMessages(prev => {
+          // Remove any existing thinking messages first
+          const filtered = prev.filter(msg => 
+            !(msg.role === 'assistant' && (msg.content === '🤔 Thinking...' || msg.content === '⚡ Processing...'))
+          )
+          return [...filtered, thinkingMessage]
+        })
         
         // Use Supabase Realtime to subscribe to orchestration updates
         console.log(`[ChatInterface] Setting up realtime subscription for session ${responseData.sessionId}`)
@@ -635,7 +655,7 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                         } ${message.error ? 'border-red-300 bg-red-50 text-red-900' : ''}`}
                       >
                         {message.role === 'assistant' ? (
-                          message.orchestrationSessionId && (message.content === '🤔 Thinking...' || message.content === '⚡ Processing...' || message.content === '🤔 Processing your request...') ? (
+                          (message.content === '🤔 Thinking...' || message.content === '⚡ Processing...' || message.content === '🤔 Processing your request...') ? (
                             <div className="flex items-center gap-2">
                               <span>{message.content.split(' ')[0]}</span>
                               <div className="flex gap-1">
@@ -683,20 +703,34 @@ export default function ChatInterface({ sessionId, onThreadCreated }: ChatInterf
                   )}
                 </div>
               )})}
-              {isLoading && !messages.some(msg => msg.orchestrationSessionId === currentOrchestrationId) && (
-                <div className="flex gap-4 justify-start">
-                  <div className="w-8 h-8 bg-gray-700 text-white rounded-full flex items-center justify-center flex-shrink-0">
-                    <span className="text-sm font-medium">H</span>
-                  </div>
-                  <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
-                    <div className="flex gap-1">
-                      <div key="dot-1" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
-                      <div key="dot-2" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
-                      <div key="dot-3" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+              {(() => {
+                const showFallbackLoader = isLoading && !messages.some(msg => msg.orchestrationSessionId === currentOrchestrationId)
+                if (showFallbackLoader) {
+                  console.log('[ChatInterface] Showing fallback loader:', {
+                    isLoading,
+                    currentOrchestrationId,
+                    messagesWithOrchestrationId: messages.filter(m => m.orchestrationSessionId).map(m => ({
+                      id: m.id,
+                      orchestrationSessionId: m.orchestrationSessionId,
+                      content: m.content?.substring(0, 30)
+                    }))
+                  })
+                }
+                return showFallbackLoader ? (
+                  <div className="flex gap-4 justify-start">
+                    <div className="w-8 h-8 bg-gray-700 text-white rounded-full flex items-center justify-center flex-shrink-0">
+                      <span className="text-sm font-medium">H</span>
+                    </div>
+                    <div className="bg-white border border-gray-200 rounded-lg px-4 py-3">
+                      <div className="flex gap-1">
+                        <div key="dot-1" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" />
+                        <div key="dot-2" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-100" />
+                        <div key="dot-3" className="w-2 h-2 bg-gray-400 rounded-full animate-bounce delay-200" />
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                ) : null
+              })()}
               <div ref={messagesEndRef} />
             </div>
           )}

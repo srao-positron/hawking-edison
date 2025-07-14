@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronDown, MessageSquare, Trash2, Edit2 } from 'lucide-react'
+import { ChevronDown, MessageSquare, Trash2, Edit2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { api } from '@/lib/api-client'
 import Link from 'next/link'
 import { useAuth } from '@/hooks/useAuth'
@@ -135,9 +135,18 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
   }
 
   return (
-    <div className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 ${
-      collapsed ? 'w-16' : 'w-64'
+    <div className={`bg-gray-50 border-r border-gray-200 flex flex-col transition-all duration-300 relative ${
+      collapsed ? 'w-16' : 'w-80'
     }`}>
+      {/* Toggle Button */}
+      <button
+        onClick={() => setCollapsed(!collapsed)}
+        className="absolute -right-3 top-4 bg-white border border-gray-200 rounded-full p-1 hover:bg-gray-50 transition-colors z-10 shadow-sm"
+        title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+      >
+        {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+      </button>
+      
       {/* Header */}
       <div className="p-4 border-b border-gray-200">
         <button
@@ -198,12 +207,17 @@ export default function Sidebar({ currentSessionId, onNewChat, onSelectChat, ref
                           className="flex-1 text-left min-w-0 flex items-center"
                         >
                           <div className="flex-1 min-w-0">
-                            <div className="font-medium truncate">
+                            <div className="font-medium truncate pr-1">
                               {thread.title || 'Untitled conversation'}
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5">
-                              {new Date(thread.updated_at).toLocaleDateString()}
-                              {thread.message_count > 0 && ` • ${thread.message_count} messages`}
+                            <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1">
+                              <span>{new Date(thread.updated_at).toLocaleDateString()}</span>
+                              {thread.message_count > 0 && (
+                                <>
+                                  <span>•</span>
+                                  <span className="whitespace-nowrap">{thread.message_count} {thread.message_count === 1 ? 'message' : 'messages'}</span>
+                                </>
+                              )}
                             </div>
                           </div>
                         </button>

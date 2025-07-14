@@ -1,9 +1,10 @@
 'use client'
 
 import { useEffect, useState, useRef } from 'react'
-import { ChevronRight, ChevronDown, Loader2, CheckCircle, XCircle, AlertCircle, Brain, MessageSquare, Wrench, Users } from 'lucide-react'
+import { ChevronRight, ChevronDown, Loader2, CheckCircle, XCircle, AlertCircle, Brain, MessageSquare, Wrench, Users, ArrowUpDown } from 'lucide-react'
 import { getBrowserClient } from '@/lib/supabase-browser'
 import { formatDistanceToNow } from 'date-fns'
+import ToolCard from './orchestration/ToolCard'
 
 interface OrchestrationEvent {
   id: string
@@ -60,6 +61,7 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['timeline']))
   const [expandedAgents, setExpandedAgents] = useState<Set<string>>(new Set())
   const [toolCount, setToolCount] = useState(0)
+  const [timelineSort, setTimelineSort] = useState<'newest' | 'oldest'>('newest')
   const channelRef = useRef<any>(null)
 
   useEffect(() => {
@@ -272,21 +274,37 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
     const data = event.event_data
     switch (event.event_type) {
       case 'status_update':
-        return `status_update`
+        return `Status: ${data.to || data.status || 'Updated'}`
       case 'tool_call':
-        return `${data.tool || 'tool'}_called`
+        // Try to get friendly name from metadata
+        const toolName = data.tool || 'tool'
+        if (toolName.startsWith('mcp_')) {
+          const parts = toolName.replace('mcp_', '').split('_')
+          const service = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+          return `${service} API Called`
+        }
+        return `${toolName.replace(/([A-Z])/g, ' $1').trim()} Called`
       case 'tool_result':
-        return `${data.tool || 'tool'}_${data.success ? 'completed' : 'failed'}`
+        const resultToolName = data.tool || 'tool'
+        const status = data.success ? '✓' : '✗'
+        if (resultToolName.startsWith('mcp_')) {
+          const parts = resultToolName.replace('mcp_', '').split('_')
+          const service = parts[0].charAt(0).toUpperCase() + parts[0].slice(1)
+          return `${status} ${service} Response`
+        }
+        return `${status} ${resultToolName.replace(/([A-Z])/g, ' $1').trim()}`
       case 'agent_created':
-        return `agent_created: ${data.name || 'Agent'}`
+        return `🤖 Created: ${data.name || 'Agent'}`
       case 'agent_thought':
-        return `agent_thinking: ${data.agent_name || 'Agent'}`
+        return `💭 ${data.agent_name || 'Agent'} thinking`
       case 'discussion_turn':
-        return `${data.agent_name || 'Agent'} speaking`
+        return `💬 ${data.agent_name || 'Agent'}: "${data.message?.substring(0, 50)}..."`
       case 'message':
-        return 'message_sent'
+        return '📨 Message sent'
+      case 'error':
+        return `⚠️ Error: ${data.error?.substring(0, 50)}...`
       default:
-        return event.event_type
+        return event.event_type.replace(/_/g, ' ')
     }
   }
 
@@ -379,9 +397,36 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
             }
           </button>
           
-          {expandedSections.has('tools') && toolCount === 0 && (
-            <div className="px-6 pb-4 text-gray-500 text-sm">
-              No tools have been called yet
+          {expandedSections.has('tools') && (
+            <div className="px-6 pb-4">
+              {toolCount === 0 ? (
+                <div className="text-gray-500 text-sm">
+                  No tools have been called yet
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {events
+                    .filter(e => e.event_type === 'tool_call')
+                    .map((event) => {
+                      const toolResult = events.find(
+                        e => e.event_type === 'tool_result' && 
+                        e.event_data.tool_call_id === event.event_data.tool_call_id
+                      )
+                      
+                      // Check if tool is still running (no result yet and session is active)
+                      const isPending = !toolResult && (status === 'running' || status === 'pending')
+                      
+                      return (
+                        <ToolCard
+                          key={event.id}
+                          toolCall={event.event_data}
+                          toolResult={toolResult?.event_data}
+                          isPending={isPending}
+                        />
+                      )
+                    })}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -421,26 +466,42 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
                       }
                     </button>
                     
-                    {expandedAgents.has(agent.id) && agent.thoughts.length > 0 && (
+                    {expandedAgents.has(agent.id) && (
                       <div className="mt-3 space-y-2">
-                        <div className="text-xs font-medium text-gray-700">Thoughts:</div>
-                        {agent.thoughts.map((thought, idx) => (
-                          <div 
-                            key={idx}
-                            className={`text-xs p-2 rounded ${
-                              thought.is_key_decision 
-                                ? 'bg-blue-50 border-l-2 border-blue-400' 
-                                : 'bg-gray-50'
-                            }`}
-                          >
-                            {thought.thought.length > 200 
-                              ? thought.thought.substring(0, 200) + '...' 
-                              : thought.thought}
-                            <div className="text-xs text-gray-500 mt-1">
-                              {formatDistanceToNow(new Date(thought.timestamp), { addSuffix: true })}
-                            </div>
+                        {agent.thoughts.length === 0 ? (
+                          <div className="text-xs text-gray-400 italic p-2">
+                            No thoughts recorded yet
                           </div>
-                        ))}
+                        ) : (
+                          <>
+                            <div className="text-xs font-medium text-gray-700">Thoughts & Analysis:</div>
+                            {agent.thoughts.map((thought, idx) => (
+                              <div 
+                                key={idx}
+                                className={`text-xs p-2 rounded ${
+                                  thought.is_key_decision 
+                                    ? 'bg-blue-50 border-l-2 border-blue-400' 
+                                    : thought.thought_type === 'discussion_contribution'
+                                    ? 'bg-green-50 border-l-2 border-green-400'
+                                    : 'bg-gray-50'
+                                }`}
+                              >
+                                <div className="whitespace-pre-wrap">
+                                  {thought.thought}
+                                </div>
+                                <div className="text-xs text-gray-500 mt-1 flex items-center justify-between">
+                                  <span>{formatDistanceToNow(new Date(thought.timestamp), { addSuffix: true })}</span>
+                                  {thought.is_key_decision && (
+                                    <span className="text-blue-600 font-medium">Key Decision</span>
+                                  )}
+                                  {thought.thought_type === 'discussion_contribution' && (
+                                    <span className="text-green-600 font-medium">Discussion</span>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>
@@ -469,26 +530,41 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
             
             {expandedSections.has('discussions') && (
               <div className="px-6 pb-4 space-y-3">
-                {discussions.map((discussion, idx) => (
-                  <div key={idx} className="border rounded-lg p-3">
-                    <div className="font-medium text-sm mb-2">
-                      {discussion.topic}
-                      <span className="text-xs text-gray-500 ml-2">({discussion.style})</span>
-                    </div>
-                    <div className="space-y-2 max-h-40 overflow-y-auto">
-                      {discussion.turns.map((turn, turnIdx) => (
-                        <div key={turnIdx} className="text-xs">
-                          <span className="font-medium">{turn.agent_name}:</span>
-                          <span className="text-gray-600 ml-1">
-                            {turn.message.length > 150 
-                              ? turn.message.substring(0, 150) + '...' 
-                              : turn.message}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                {discussions.length === 0 ? (
+                  <div className="text-gray-500 text-sm">
+                    No agent discussions yet
                   </div>
-                ))}
+                ) : (
+                  discussions.map((discussion, idx) => (
+                    <div key={idx} className="border rounded-lg p-3">
+                      <div className="font-medium text-sm mb-2">
+                        {discussion.topic}
+                        <span className="text-xs text-gray-500 ml-2">({discussion.style})</span>
+                      </div>
+                      <div className="text-xs text-gray-500 mb-2">
+                        {discussion.turns.length} exchange{discussion.turns.length !== 1 ? 's' : ''}
+                      </div>
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {discussion.turns.length === 0 ? (
+                          <div className="text-gray-400 text-xs italic">
+                            Waiting for agent responses...
+                          </div>
+                        ) : (
+                          discussion.turns.map((turn, turnIdx) => (
+                            <div key={turnIdx} className="bg-gray-50 rounded p-2">
+                              <div className="font-medium text-xs text-gray-700 mb-1">
+                                {turn.agent_name} (Round {turn.round}):
+                              </div>
+                              <div className="text-xs text-gray-600 whitespace-pre-wrap">
+                                {turn.message}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>
@@ -500,7 +576,22 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
             onClick={() => toggleSection('timeline')}
             className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors"
           >
-            <span className="font-medium">Timeline ({events.length})</span>
+            <div className="flex items-center gap-3">
+              <span className="font-medium">Timeline ({events.length})</span>
+              {expandedSections.has('timeline') && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setTimelineSort(timelineSort === 'newest' ? 'oldest' : 'newest')
+                  }}
+                  className="flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700"
+                  title={`Sort by ${timelineSort === 'newest' ? 'oldest' : 'newest'} first`}
+                >
+                  <ArrowUpDown className="w-3 h-3" />
+                  <span>{timelineSort === 'newest' ? 'Newest' : 'Oldest'}</span>
+                </button>
+              )}
+            </div>
             {expandedSections.has('timeline') ? 
               <ChevronDown className="w-4 h-4 text-gray-400" /> : 
               <ChevronRight className="w-4 h-4 text-gray-400" />
@@ -513,7 +604,7 @@ export default function OrchestrationPanel({ sessionId, isVisible, onClose }: Or
                 {events.length === 0 ? (
                   <div className="text-gray-500 text-sm">No events yet</div>
                 ) : (
-                  events.slice().reverse().map((event) => (
+                  (timelineSort === 'newest' ? events.slice().reverse() : events.slice()).map((event) => (
                     <div key={event.id} className="flex items-start gap-3">
                       <div className="flex-1">
                         <div className="text-sm font-medium text-gray-900">
