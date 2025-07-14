@@ -408,24 +408,70 @@ async function handleError(supabase: any, sessionId: string, error: any) {
 
 
 // Generate AI summary for tool execution
-async function generateToolSummary(toolCall: ToolCall, toolResult: any): Promise<string | undefined> {
+async function generateToolSummary(toolCall: ToolCall, toolResult: any, session: Session): Promise<string | undefined> {
   try {
     // Only generate summaries for successful executions with results
     if (!toolResult.success || !toolResult.result) {
       return undefined
     }
 
+    // Get the original user question from session messages
+    const userMessages = session.messages?.filter((m: any) => m.role === 'user') || []
+    const originalQuestion = userMessages[userMessages.length - 1]?.content || 'the user\'s request'
+
     const prompts: Record<string, string> = {
-      runDiscussion: `Summarize this multi-agent discussion in 2-3 sentences. Focus on the key insights and conclusions reached. Result: ${JSON.stringify(toolResult.result).slice(0, 1000)}`,
-      createAgent: `Describe this newly created agent in 1-2 sentences. Focus on their role and expertise. Agent: ${JSON.stringify(toolResult.result).slice(0, 500)}`,
-      analyzeResponses: `Summarize this analysis in 2-3 sentences. Highlight key findings and recommendations. Analysis: ${JSON.stringify(toolResult.result).slice(0, 1000)}`,
-      gatherResponses: `Summarize these gathered responses in 1-2 sentences. Focus on the diversity of perspectives. Responses: ${JSON.stringify(toolResult.result).slice(0, 1000)}`
+      runDiscussion: `You are providing a real-time update about an expert discussion. The user asked: "${originalQuestion}"
+
+The experts just had this discussion:
+${JSON.stringify(toolResult.result).slice(0, 2000)}
+
+Write a 2-3 sentence update that:
+1. Directly relates to the user's question
+2. Highlights the most important insights from the discussion
+3. Uses clear, non-technical language
+4. Shows what specific progress was made
+
+Focus on substance, not process. What did they actually conclude about the user's question?`,
+      
+      createAgent: `You are introducing a new expert who will help answer: "${originalQuestion}"
+
+Expert details: ${JSON.stringify(toolResult.result).slice(0, 800)}
+
+Write a 1-2 sentence introduction that:
+1. Names the expert and their specific expertise
+2. Explains why this particular expert is valuable for answering the user's question
+3. Uses natural, conversational language
+
+Example: "Dr. Sarah Chen, a cybersecurity expert with 15 years in threat analysis, will examine the security implications of your proposed system architecture."`,
+      
+      analyzeResponses: `You are summarizing the team's analysis of: "${originalQuestion}"
+
+Analysis results: ${JSON.stringify(toolResult.result).slice(0, 2000)}
+
+Write a 2-3 sentence summary that:
+1. Directly answers or addresses the user's original question
+2. Highlights the key findings, consensus points, or recommendations
+3. Uses clear language accessible to non-technical users
+4. Focuses on conclusions and actionable insights
+
+Avoid generic statements. Be specific about what the team discovered.`,
+      
+      gatherResponses: `The team is providing their individual perspectives on: "${originalQuestion}"
+
+Responses: ${JSON.stringify(toolResult.result).slice(0, 1500)}
+
+Write a 1-2 sentence summary that:
+1. Shows the range of perspectives on the user's question
+2. Highlights any interesting agreements or disagreements
+3. Teases what insights are emerging
+
+Focus on the substance of their responses, not just that they responded.`
     }
 
     const prompt = prompts[toolCall.name]
     if (!prompt) return undefined
 
-    // Use Claude Haiku for quick summaries
+    // Use Claude Haiku for quick, contextual summaries
     const messages: LLMMessage[] = [{
       role: 'user',
       content: prompt
@@ -434,7 +480,7 @@ async function generateToolSummary(toolCall: ToolCall, toolResult: any): Promise
     const response = await callLLMWithTools(
       messages,
       [],
-      'claude'
+      'claude-3-haiku'
     )
 
     return response.content || undefined
@@ -453,39 +499,108 @@ async function generatePhaseSummary(session: Session, supabase: any): Promise<vo
       .select('*')
       .eq('session_id', session.id)
       .order('created_at', { ascending: false })
-      .limit(20)
+      .limit(50) // Get more events for better context
 
     if (!events || events.length === 0) return
 
-    // Analyze phase based on events
-    const hasAgents = events.some((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'createAgent')
-    const hasDiscussion = events.some((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'runDiscussion')
-    const hasAnalysis = events.some((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'analyzeResponses')
+    // Get the original user question
+    const userMessages = session.messages?.filter((m: any) => m.role === 'user') || []
+    const originalQuestion = userMessages[userMessages.length - 1]?.content || 'the request'
+
+    // Get all tool results for context
+    const toolResults = events.filter((e: any) => e.event_type === 'tool_result')
+    const agents = toolResults.filter((e: any) => e.event_data?.tool === 'createAgent')
+    const discussions = toolResults.filter((e: any) => e.event_data?.tool === 'runDiscussion')
+    const analyses = toolResults.filter((e: any) => e.event_data?.tool === 'analyzeResponses')
     
+    // Extract key information
+    const agentNames = agents.map((e: any) => {
+      const result = e.event_data?.result
+      if (result && typeof result === 'object' && result.name) {
+        return result.name
+      }
+      return null
+    }).filter(Boolean)
+
+    // Determine phase and generate contextual description
     let phaseType = 'initialization'
-    let phaseDescription = 'Setting up to address your request'
+    let contextualDescription = `Preparing to address: "${originalQuestion.slice(0, 100)}${originalQuestion.length > 100 ? '...' : ''}"`
     
-    if (hasAnalysis) {
+    if (analyses.length > 0) {
       phaseType = 'synthesis'
-      phaseDescription = 'Synthesizing findings and preparing recommendations'
-    } else if (hasDiscussion) {
+      const latestAnalysis = analyses[0].event_data?.result
+      const keyFindings = latestAnalysis?.key_concerns?.length || 0
+      const recommendations = latestAnalysis?.recommendations?.length || 0
+      contextualDescription = `Synthesizing ${keyFindings} key findings and ${recommendations} recommendations from the team's analysis`
+    } else if (discussions.length > 0) {
       phaseType = 'collaboration'
-      phaseDescription = 'Team members are discussing and sharing perspectives'
-    } else if (hasAgents) {
+      const activeDiscussions = discussions.filter((d: any) => {
+        const timestamp = new Date(d.created_at).getTime()
+        const now = Date.now()
+        return (now - timestamp) < 60000 // Within last minute
+      }).length
+      contextualDescription = `${agentNames.slice(0, 3).join(', ')}${agentNames.length > 3 ? ' and others' : ''} are actively discussing your question${activeDiscussions > 0 ? ' (live discussion in progress)' : ''}`
+    } else if (agents.length > 0) {
       phaseType = 'team_building'
-      phaseDescription = 'Assembling the right experts for your challenge'
+      const expertTypes = new Set(agents.map((a: any) => {
+        const expertise = a.event_data?.result?.expertise
+        if (Array.isArray(expertise) && expertise.length > 0) {
+          return expertise[0]
+        }
+        return null
+      }).filter(Boolean))
+      contextualDescription = `Assembled ${agents.length} experts including ${Array.from(expertTypes).slice(0, 3).join(', ')} specialists to tackle your question`
     }
 
-    // Log phase summary event
+    // Generate AI-powered phase insight if we have substantial activity
+    let phaseInsight: string | undefined
+    if (toolResults.length >= 3) {
+      try {
+        const recentActivity = toolResults.slice(0, 5).map((e: any) => ({
+          tool: e.event_data?.tool,
+          summary: e.event_data?.summary || 'No summary',
+          timestamp: e.created_at
+        }))
+
+        const insightPrompt = `Based on this orchestration activity for the question "${originalQuestion}", provide a single sentence insight about what's happening:
+
+Recent activity:
+${JSON.stringify(recentActivity, null, 2)}
+
+Write one clear, specific sentence that tells the user what substantive progress is being made on their question. Focus on insights and findings, not process.`
+
+        const messages: LLMMessage[] = [{
+          role: 'user',
+          content: insightPrompt
+        }]
+        
+        const response = await callLLMWithTools(
+          messages,
+          [],
+          'claude-3-haiku'
+        )
+
+        phaseInsight = response.content || undefined
+      } catch (err) {
+        console.error('Failed to generate phase insight:', err)
+      }
+    }
+
+    // Log enhanced phase summary event
     await supabase.rpc('log_orchestration_event', {
       p_session_id: session.id,
       p_event_type: 'phase_summary',
       p_event_data: {
         phase: phaseType,
-        description: phaseDescription,
-        progress: Math.min(session.execution_count * 20, 90), // Rough progress estimate
-        agentCount: events.filter((e: any) => e.event_type === 'tool_result' && e.event_data?.tool === 'createAgent').length,
-        toolsUsed: events.filter((e: any) => e.event_type === 'tool_call').length
+        description: contextualDescription,
+        insight: phaseInsight,
+        progress: Math.min(session.execution_count * 15 + 10, 90), // More realistic progress
+        agentCount: agents.length,
+        agentNames: agentNames.slice(0, 5), // First 5 agent names
+        discussionCount: discussions.length,
+        analysisCount: analyses.length,
+        toolsUsed: events.filter((e: any) => e.event_type === 'tool_call').length,
+        userQuestion: originalQuestion.slice(0, 200) // Include truncated question for UI
       }
     })
   } catch (error) {
@@ -823,7 +938,7 @@ export const handler: SQSHandler = async (event: SQSEvent) => {
             // Generate AI summary for specific tools
             let summary: string | undefined
             if (['runDiscussion', 'createAgent', 'analyzeResponses', 'gatherResponses'].includes(toolCall.name)) {
-              summary = await generateToolSummary(toolCall, resultData)
+              summary = await generateToolSummary(toolCall, resultData, session)
             }
             
             // Log tool result event with summary

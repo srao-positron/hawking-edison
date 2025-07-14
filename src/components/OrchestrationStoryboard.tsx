@@ -104,19 +104,22 @@ const StoryPhase = ({ phase, isActive, agents, events }: any) => {
         )}
         
         {phase.insights && phase.insights.length > 0 && (
-          <div className="mt-4 space-y-2">
-            {phase.insights.map((insight: string, idx: number) => (
-              <motion.div
-                key={idx}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.1 }}
-                className="flex items-start gap-2"
-              >
-                <Lightbulb className="w-4 h-4 text-yellow-500 mt-0.5" />
-                <span className="text-sm text-gray-700">{insight}</span>
-              </motion.div>
-            ))}
+          <div className="mt-4 bg-gradient-to-r from-blue-50 to-purple-50 rounded-xl p-4">
+            <h4 className="text-xs font-semibold text-gray-600 uppercase tracking-wider mb-3">What's Happening</h4>
+            <div className="space-y-2">
+              {phase.insights.map((insight: string, idx: number) => (
+                <motion.div
+                  key={idx}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: idx * 0.1 }}
+                  className="flex items-start gap-3"
+                >
+                  <Lightbulb className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm text-gray-700 leading-relaxed">{insight}</span>
+                </motion.div>
+              ))}
+            </div>
           </div>
         )}
       </div>
@@ -185,61 +188,97 @@ export default function OrchestrationStoryboard({
   const generateStoryPhases = () => {
     const phases = []
     
+    // Get phase summaries and tool summaries from events
+    const phaseSummaryEvents = events.filter(e => e.event_type === 'phase_summary')
+    const latestPhaseSummary = phaseSummaryEvents[0]?.event_data
+    
+    // Get tool result summaries
+    const toolSummaries = Array.from(toolResults.values())
+      .map((tr) => {
+        const toolCall = toolCalls.find(tc => tc.tool_call_id === tr.tool_call_id)
+        return {
+          tool: toolCall?.tool,
+          summary: tr.summary,
+          result: tr.result
+        }
+      })
+      .filter(ts => ts.summary)
+    
     // Phase 1: Team Assembly
     if (agents.length > 0) {
+      const agentSummaries = toolSummaries
+        .filter(ts => ts.tool === 'createAgent')
+        .map(ts => ts.summary)
+      
       phases.push({
         type: 'assembling',
         title: 'Assembling the Team',
-        description: `Bringing together ${agents.length} expert${agents.length > 1 ? 's' : ''} for this challenge`,
+        description: latestPhaseSummary?.phase === 'team_building' && latestPhaseSummary?.description
+          ? latestPhaseSummary.description
+          : `Bringing together ${agents.length} expert${agents.length > 1 ? 's' : ''} for this challenge`,
         agents: agents.slice(0, 3),
-        insights: agents.map(a => `${a.name} joins with expertise in ${a.specification}`)
+        insights: agentSummaries.length > 0
+          ? agentSummaries
+          : agents.map(a => `${a.name} joins with expertise in ${a.specification}`),
+        contextual: latestPhaseSummary?.insight
       })
     }
     
-    // Phase 2: Initial Analysis
-    const thinkingEvents = events.filter(e => e.event_type === 'thinking' || e.event_type === 'agent_thought')
-    if (thinkingEvents.length > 0) {
-      phases.push({
-        type: 'analyzing',
-        title: 'Analyzing the Challenge',
-        description: 'The team examines the problem from multiple angles',
-        agents: agents.slice(0, 2),
-        insights: [
-          'Breaking down the problem into manageable components',
-          'Identifying key success criteria',
-          'Determining the best approach'
-        ]
-      })
-    }
+    // Phase 2: Discussion & Analysis
+    const discussionSummaries = toolSummaries.filter(ts => ts.tool === 'runDiscussion')
+    const gatherSummaries = toolSummaries.filter(ts => ts.tool === 'gatherResponses')
     
-    // Phase 3: Team Discussion
-    if (discussions.length > 0) {
-      const totalTurns = discussions.reduce((sum, d) => sum + d.turns.length, 0)
+    if (discussionSummaries.length > 0 || gatherSummaries.length > 0) {
       phases.push({
         type: 'discussing',
         title: 'Team Collaboration',
-        description: `${totalTurns} exchanges as the team debates and refines ideas`,
-        agents: agents,
-        insights: [
-          'Diverse perspectives emerge',
-          'Building on each other\'s ideas',
-          'Converging toward solutions'
-        ]
+        description: latestPhaseSummary?.phase === 'collaboration' && latestPhaseSummary?.description
+          ? latestPhaseSummary.description
+          : 'The team is actively discussing your question',
+        agents: agents.slice(0, Math.min(5, agents.length)),
+        insights: [...discussionSummaries, ...gatherSummaries]
+          .map(ts => ts.summary)
+          .filter(Boolean)
+          .slice(0, 3),
+        contextual: latestPhaseSummary?.phase === 'collaboration' ? latestPhaseSummary?.insight : null
+      })
+    }
+    
+    // Phase 3: Synthesis & Analysis
+    const analysisSummaries = toolSummaries.filter(ts => ts.tool === 'analyzeResponses')
+    
+    if (analysisSummaries.length > 0) {
+      phases.push({
+        type: 'analyzing',
+        title: 'Synthesizing Insights',
+        description: latestPhaseSummary?.phase === 'synthesis' && latestPhaseSummary?.description
+          ? latestPhaseSummary.description
+          : 'Analyzing and synthesizing team findings',
+        insights: analysisSummaries
+          .map(ts => ts.summary)
+          .filter(Boolean),
+        contextual: latestPhaseSummary?.phase === 'synthesis' ? latestPhaseSummary?.insight : null
       })
     }
     
     // Phase 4: Conclusions
     if (status === 'completed') {
+      // Try to find the final analysis or last meaningful summary
+      const finalAnalysis = toolSummaries.find(ts => ts.tool === 'analyzeResponses')
+      const lastDiscussion = toolSummaries.filter(ts => ts.tool === 'runDiscussion').pop()
+      const finalInsights = [finalAnalysis?.summary, lastDiscussion?.summary].filter(Boolean)
+      
       phases.push({
         type: 'concluding',
         title: 'Final Recommendations',
-        description: 'The team presents their unified findings',
+        description: latestPhaseSummary?.userQuestion 
+          ? `Team's conclusions for: "${latestPhaseSummary.userQuestion.slice(0, 80)}..."`
+          : 'The team presents their unified findings',
         agents: agents,
-        insights: [
-          'Key recommendations identified',
-          'Action items prioritized',
-          'Next steps outlined'
-        ]
+        insights: finalInsights.length > 0
+          ? finalInsights
+          : ['Analysis complete', 'Recommendations prepared'],
+        contextual: latestPhaseSummary?.insight
       })
     }
     
@@ -301,7 +340,7 @@ export default function OrchestrationStoryboard({
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden">
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden" style={{ marginLeft: '280px' }}>
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b px-8 py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -404,14 +443,14 @@ export default function OrchestrationStoryboard({
         </div>
       </div>
 
-      {/* Team roster (always visible) */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-sm border-t px-8 py-4">
-        <div className="max-w-7xl mx-auto">
+      {/* Team roster (collapsible) */}
+      <div className="fixed bottom-0 right-0 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-tl-2xl shadow-lg transition-all duration-300" style={{ left: '280px', maxWidth: 'calc(100% - 280px)' }}>
+        <div className="px-6 py-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-6">
-              <span className="text-sm font-medium text-gray-600">Your Team:</span>
-              <div className="flex items-center gap-4">
-                {agents.slice(0, 5).map((agent) => (
+            <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide">
+              <span className="text-sm font-medium text-gray-600 whitespace-nowrap">Your Team:</span>
+              <div className="flex items-center gap-3">
+                {agents.slice(0, 8).map((agent) => (
                   <AgentAvatar key={agent.id} agent={agent} size="sm" />
                 ))}
                 {agents.length > 5 && (
