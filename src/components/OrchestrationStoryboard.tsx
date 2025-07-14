@@ -16,7 +16,13 @@ interface OrchestrationStoryboardProps {
 }
 
 // Agent avatar component with personality
-const AgentAvatar = ({ agent, size = 'md', showThinking = false }: any) => {
+interface AgentAvatarProps {
+  agent: { name: string; role?: string; expertise?: string[] }
+  size?: 'sm' | 'md' | 'lg'
+  showThinking?: boolean
+}
+
+const AgentAvatar = ({ agent, size = 'md', showThinking = false }: AgentAvatarProps) => {
   const sizes = {
     sm: 'w-10 h-10 text-sm',
     md: 'w-14 h-14 text-base',

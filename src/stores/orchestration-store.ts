@@ -76,6 +76,7 @@ export interface SessionInfo {
   status: 'pending' | 'running' | 'completed' | 'failed'
   error?: string
   completedAt?: string
+  created_at?: string
 }
 
 interface OrchestrationState {

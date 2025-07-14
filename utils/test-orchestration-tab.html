@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Orchestration Tab</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .instructions {
+            background: #f0f0f0;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .expected {
+            color: green;
+            font-weight: bold;
+        }
+        .console-log {
+            background: #222;
+            color: #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 12px;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        code {
+            background: #e0e0e0;
+            padding: 2px 4px;
+            border-radius: 2px;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test Orchestration Tab Opening</h1>
+    
+    <div class="instructions">
+        <h2>Test Steps:</h2>
+        
+        <div class="step">
+            <h3>1. Open the app at <code>http://localhost:3001/chat</code></h3>
+            <p>Make sure the dev server is running with <code>npm run dev</code></p>
+        </div>
+        
+        <div class="step">
+            <h3>2. Open browser console (F12)</h3>
+            <p>You should see logging statements as you interact with the app</p>
+        </div>
+        
+        <div class="step">
+            <h3>3. Send a message that triggers orchestration</h3>
+            <p>Try: "Create 3 experts to analyze the future of AI"</p>
+            <p class="expected">Expected: Message sends and shows "⚡ Processing..." or "🤔 Thinking..."</p>
+        </div>
+        
+        <div class="step">
+            <h3>4. Wait for response with "Details" button</h3>
+            <p>Once the orchestration completes, you should see a response with a blue "Details" link</p>
+            <p class="expected">Expected: Response shows with a clickable "Details" button</p>
+        </div>
+        
+        <div class="step">
+            <h3>5. Click the "Details" button</h3>
+            <p class="expected">Expected console logs:</p>
+            <div class="console-log">[ChatInterface] Opening orchestration tab for: &lt;session-id&gt;
+[ChatStore] openOrchestrationTab called: { orchestrationId: '...', title: '...' }
+[ChatStore] Creating new tab: { id: 'orch-...', type: 'orchestration', ... }
+[ChatStore] After addTab, activeTabId is: orch-...
+[TabManager] Rendering tab: { id: 'orch-...', type: 'orchestration', isActive: true }</div>
+        </div>
+        
+        <div class="step">
+            <h3>6. Verify tab opened</h3>
+            <p class="expected">Expected: New "Details" tab appears in tab bar and is active</p>
+            <p class="expected">Expected: Orchestration panel shows with timeline, agents, etc.</p>
+        </div>
+    </div>
+    
+    <div class="instructions">
+        <h2>🔍 Debugging Tips:</h2>
+        <ul>
+            <li>If tab doesn't appear: Check console for <code>[ChatStore] openOrchestrationTab</code> log</li>
+            <li>If tab appears but isn't active: Check <code>activeTabId</code> in logs</li>
+            <li>If panel is blank: Check <code>sessionId</code> is being passed correctly</li>
+            <li>Use React DevTools to inspect the Zustand store state</li>
+        </ul>
+    </div>
+    
+    <div class="instructions">
+        <h2>📋 What We Fixed:</h2>
+        <ul>
+            <li>✅ Migrated all state to Zustand chat-store.ts</li>
+            <li>✅ Removed local state from Sidebar, ChatPage, TabManager</li>
+            <li>✅ Thread selection now properly updates all components</li>
+            <li>✅ Tab management centralized in store</li>
+            <li>🔍 Currently debugging: Details tab activation</li>
+        </ul>
+    </div>
+</body>
+</html>
