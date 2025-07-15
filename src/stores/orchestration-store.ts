@@ -422,32 +422,41 @@ export const useOrchestrationStore = create<OrchestrationStore>()(
                 })
               }
               
-              if (toolCall?.tool === 'runDiscussion' && data.success && data.result?.discussion) {
+              if (toolCall?.tool === 'runDiscussion' && data.success && data.result) {
                 const discussionData = data.result
-                set(state => {
-                  const discussions = state.discussionsBySession.get(sessionId) || []
-                  
-                  // Create a new discussion from the tool result
-                  const discussion: Discussion = {
-                    id: data.tool_call_id, // Use tool_call_id as discussion id
-                    topic: discussionData.topic || 'Discussion',
-                    style: discussionData.style || 'collaborative',
-                    turns: discussionData.discussion.map((turn: any) => ({
-                      agent_id: turn.agent,
-                      agent_name: turn.agent,
-                      message: turn.content,
-                      round: turn.round,
-                      timestamp: turn.timestamp || event.created_at
-                    }))
-                  }
-                  
-                  return {
-                    discussionsBySession: new Map(state.discussionsBySession).set(
-                      sessionId,
-                      [...discussions, discussion]
-                    )
-                  }
-                })
+                console.log('[OrchestrationStore] Processing runDiscussion result:', discussionData)
+                
+                // The discussion array is directly in result.discussion
+                if (discussionData.discussion && discussionData.discussion.length > 0) {
+                  set(state => {
+                    const discussions = state.discussionsBySession.get(sessionId) || []
+                    
+                    // Create a new discussion from the tool result
+                    const discussion: Discussion = {
+                      id: data.tool_call_id, // Use tool_call_id as discussion id
+                      topic: discussionData.topic || 'Discussion',
+                      style: discussionData.style || 'collaborative',
+                      turns: discussionData.discussion.map((turn: any) => ({
+                        agent_id: turn.agent || turn.agent_id,
+                        agent_name: turn.agent || turn.agent_name,
+                        message: turn.content || turn.message,
+                        round: turn.round || 1,
+                        timestamp: turn.timestamp || event.created_at
+                      }))
+                    }
+                    
+                    console.log('[OrchestrationStore] Created discussion with', discussion.turns.length, 'turns')
+                    
+                    return {
+                      discussionsBySession: new Map(state.discussionsBySession).set(
+                        sessionId,
+                        [...discussions, discussion]
+                      )
+                    }
+                  })
+                } else {
+                  console.warn('[OrchestrationStore] No discussion array found in runDiscussion result')
+                }
               }
               
               // Detect and extract artifacts

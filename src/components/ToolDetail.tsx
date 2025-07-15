@@ -122,10 +122,15 @@ export default function ToolDetail({ toolCall, toolResult }: ToolDetailProps) {
       const result = toolResult.result
       const agents = toolCall.arguments.agents || []
       
+      console.log('[ToolDetail] runDiscussion result:', result)
+      console.log('[ToolDetail] toolResult full:', toolResult)
+      
       // Group turns by round for better visualization
       const turnsByRound: { [key: number]: any[] } = {}
       // Handle both old format (turns) and new format (discussion)
       const discussionArray = result.discussion || result.turns || []
+      
+      console.log('[ToolDetail] discussionArray:', discussionArray)
       
       if (discussionArray.length > 0) {
         discussionArray.forEach((turn: any) => {
