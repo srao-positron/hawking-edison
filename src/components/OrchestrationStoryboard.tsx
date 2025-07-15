@@ -308,13 +308,21 @@ export default function OrchestrationStoryboard({
 
   // Auto-advance phases
   useEffect(() => {
-    if (isPlaying && phases.length > 0) {
+    if (isPlaying && phases.length > 0 && status !== 'completed' && status !== 'failed') {
       const timer = setInterval(() => {
         setCurrentPhase(prev => (prev + 1) % phases.length)
       }, 5000)
       return () => clearInterval(timer)
     }
-  }, [isPlaying, phases.length])
+  }, [isPlaying, phases.length, status])
+
+  // Jump to last phase when completed
+  useEffect(() => {
+    if (status === 'completed' && phases.length > 0) {
+      setCurrentPhase(phases.length - 1)
+      setIsPlaying(false)
+    }
+  }, [status, phases.length])
 
   if (!isVisible) return null
 
@@ -340,7 +348,7 @@ export default function OrchestrationStoryboard({
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden" style={{ marginLeft: '280px' }}>
+    <div className="fixed inset-0 bg-gradient-to-br from-blue-50 via-white to-purple-50 overflow-hidden" style={{ marginLeft: '300px' }}>
       {/* Header */}
       <div className="bg-white/80 backdrop-blur-sm border-b px-8 py-6">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
@@ -374,7 +382,7 @@ export default function OrchestrationStoryboard({
       </div>
 
       {/* Main Content */}
-      <div className="h-full overflow-y-auto pb-32">
+      <div className="h-full overflow-y-auto pb-40">
         <div className="max-w-7xl mx-auto px-8 py-12">
           {/* Progress indicator */}
           <div className="flex items-center justify-center gap-2 mb-12">
@@ -444,7 +452,7 @@ export default function OrchestrationStoryboard({
       </div>
 
       {/* Team roster (collapsible) */}
-      <div className="fixed bottom-0 right-0 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-tl-2xl shadow-lg transition-all duration-300" style={{ left: '280px', maxWidth: 'calc(100% - 280px)' }}>
+      <div className="fixed bottom-0 right-0 bg-white/95 backdrop-blur-sm border border-gray-200 rounded-tl-2xl shadow-lg transition-all duration-300" style={{ left: '300px', maxWidth: 'calc(100% - 300px)', maxHeight: '80px', zIndex: 10 }}>
         <div className="px-6 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4 overflow-x-auto scrollbar-hide">

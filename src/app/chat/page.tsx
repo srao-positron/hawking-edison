@@ -49,7 +49,7 @@ function ChatPageContent() {
       console.log('[ChatPage] No thread in URL but have selection, clearing')
       selectThread(null)
     }
-  }, [params.threadId, searchParams, selectedThreadId, selectThread, pathname])
+  }, [params.threadId, pathname, searchParams, selectThread]) // Remove selectedThreadId from deps to avoid infinite loop
 
   // Load threads on mount
   useEffect(() => {

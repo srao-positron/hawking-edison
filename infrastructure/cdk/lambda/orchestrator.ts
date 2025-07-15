@@ -479,8 +479,7 @@ Focus on the substance of their responses, not just that they responded.`
     
     const response = await callLLMWithTools(
       messages,
-      [],
-      'claude-3-haiku'
+      []
     )
 
     return response.content || undefined
@@ -576,8 +575,7 @@ Write one clear, specific sentence that tells the user what substantive progress
         
         const response = await callLLMWithTools(
           messages,
-          [],
-          'claude-3-haiku'
+          []
         )
 
         phaseInsight = response.content || undefined
